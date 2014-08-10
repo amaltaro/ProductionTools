@@ -35,6 +35,8 @@ setQuery = """
            UPDATE dbsbuffer_file set in_phedex = 1 where lfn = :lfn
            """
 
+### TODO: organize this messs
+
 def main():
     """
     _main_
@@ -52,26 +54,25 @@ def main():
 #                     "--component=PhEDExInjector"], stdout=open(os.devnull, 'wb'))
     #time.sleep(5)
 
+    ## TASK1: query DB for files not injected in phedex yet
     # Get the files that the PhEDExInjector would look for
     formatter = DBFormatter(logging, myThread.dbi)
     formatter.sql = getQuery
     results = formatter.execute()
     fileList = []
     fileList = [lfn[0] for lfn in results]
-    #fileList.sort()
-    #print "fileLists: ", fileList
-    print "fileLists: "
+    print "Original list retrieved from the DB:"
     pprint(fileList)
-    reducedLfns = [lfn[0].rsplit('/',2)[0] for lfn in results]
-    print "reducedLfns: "
-    pprint(reducedLfns)
+
+    ## TASK2: makes lfns a bit shorter to sort and uniq them
+    reducedLfns = [lfn.rsplit('/',2)[0] for lfn in fileList]
     reducedLfns = list(set(reducedLfns))
-    print "reducedLfns uniq: "
+    print "Short uniq list of LFNs: "
     pprint(reducedLfns)
     print "Original list length: %d\tReduced list length: %d" % (len(fileList),len(reducedLfns))
 
-    ### TODO: Now it's time to get rid of lfns that belong to datasets that
-    ### have the same number of files in both DBS (valid only) and PhEDEx
+    ## TASK3: build uniq dataset names and check whether PhEDEx and DBS contain
+    ## the same number of files. If so, then those lfns are healthy
     crippleLfns, healthyLfns = [], []
     for lfn in reducedLfns:
         lfnAux = lfn.split ('/')
@@ -81,29 +82,29 @@ def main():
         for item in result["phedex"]["block"]:
             phedexFiles += item['files']
 
-        # TODO: ValidFile is only available for > 0.9.95pre5
+        ## TODO: ValidFile is only available for > 0.9.95pre5. Once all agents are
+        ## upgraded, then we can start using this new query.
         #result = myDBS.listDatasetFileDetails(dset)
         #dbsFiles = 0
         #for item in result.itervalues():
         #    dbsFiles += 1 if item['ValidFile'] else 0
 
-        # TODO: replace this call by the above one once we completely migrate
-        # to WMA > 0.9.95b. For now it returns valid+invalid files
+        # This call returns valid+invalid number of filesfiles
         result = myDBS.listDatasetFiles(dset)
         dbsFiles = len(result)
         print "Dataset: %s\tPhEDEx files: %d\tDBS files: %d" % (dset, phedexFiles, dbsFiles)
-
         if phedexFiles == dbsFiles:
             healthyLfns.append(lfn)
         else:
             crippleLfns.append(lfn)
 
-    print "crippleLfns: "
+    print "Short uniq LFNs that may not be in PhEDEx: "
     pprint(crippleLfns)
-    print "healthyLfns: "
+    print "Short uniq LFNs that certainly are in PhEDEx already: "
     pprint(healthyLfns)
 
-    ### TODO: now we have to filter the original list with the cripple one
+    ## TASK4: map the short cripple and healthy lists to the full original lfns
+    ## TODO: this code looks terrible... IMPROVE IT!
     if crippleLfns:
         filesToCheck = []
         for lfn in crippleLfns:
@@ -111,45 +112,55 @@ def main():
             for file in fileList:
                 if lfn in file:
                     filesToCheck.append(lfn)
-        print "Bad files: "
+        print "Complete LFNs that may not be in PhEDEx: "
         pprint(filesToCheck)
+    else:
+        filesToCheck = []
     if healthyLfns:
+        filesInPhedex = []
         for lfn in healthyLfns:
-            #filesNotToCheck = [file for file in fileList if lfn in file]
+            #filesInPhedex = [file for file in fileList if lfn in file]
             for file in fileList:
                 if lfn in file:
-                    filesNotToCheck.append(lfn)
-        print "Good files: "
-        pprint(filesNotToCheck)
+                    filesInPhedex.append(lfn)
+        print "Complete LFNs that certainly are in PhEDEx already: "
+        pprint(filesInPhedex)
+    else:
+        filesInPhedex = []
 
-    sys.exit(1)
-
-    ### TODO: now we ask PhEDEx for the remaining lfns
-    filesInPhedex = set()
-    filesNotInPhedex = set()
-    for lfn in fileList:
+    ## TASK5: query PhEDEx for each cripple lfn (filesToCheck)
+    ## and build the final lfn lists
+    missingFiles = []
+    for lfn in filesToCheck:
         result = myPhEDEx._getResult('data', args = {'file' : lfn}, verb = 'GET')
         if len(result['phedex']['dbs']):
             filesInPhedex.append(lfn)
         else:
-            filesNotInPhedex.append(lfn)
+            missingFiles.append(lfn)
 
+    print "LFNs to fix/mark as in_phedex=1"
+    pprint(filesInPhedex)
+    print "LFNs not in PhEDEx yet (keep them in in_phedex=0)"
+    pprint(missingFiles)
 
-    if not foundFiles:
-        print "I didn't find an abnormal file, feel free to panic!. Please contact a developer."
+    if not filesInPhedex:
+        print "There are no files to be updated in the buffer. Contact a developer."
         return 0
-    print "Found %d files that are already registered in PhEDEx but the buffer doesn't know" % len(foundFiles)
-    print "Fixing them now..."
+    print "Found %d files that are already registered in PhEDEx but buffer doesn't know" % len(filesInPhedex)
+    print "Fixing them now, it may take several minutes ..."
+
+    sys.exit(1)
+
     # Fix it!
     binds = []
-    for lfn in foundFiles:
-        binds.append({'lfn' :lfn})
-    formatter.dbi.processData(modification, binds,
-                                        conn = None,
-                                        transaction = False,
-                                        returnCursor = False)
-    print "Fixed them! :)"
-    print "You can restart the PhEDExInjector now, have a nice day!"
+    for lfn in filesInPhedex:
+        binds.append({'lfn': lfn})
+    formatter.dbi.processData(setQuery, binds)
+    print "Rows were successfully updated! Good job!"
+    print "Starting PhEDExInjector now ..."
+#    subprocess.call([os.environ['manage'], "execute-agent", "wmcoreD", "--start",
+#                     "--component=PhEDExInjector"], stdout=open(os.devnull, 'wb'))
+    print "Done!"
     return 0
 
 if __name__ == '__main__':
