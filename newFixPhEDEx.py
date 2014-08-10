@@ -125,6 +125,9 @@ def main():
 
     if not filesInPhedex:
         print "There are no files to be updated in the buffer. Contact a developer."
+        print "Starting PhEDExInjector now ..."
+        subprocess.call([os.environ['manage'], "execute-agent", "wmcoreD", "--start",
+                     "--component=PhEDExInjector"], stdout=open(os.devnull, 'wb'))
         return 0
     print "Found %d files that are already registered in PhEDEx but buffer doesn't know" % len(filesInPhedex)
     print "Fixing them now, it may take several minutes ..."
