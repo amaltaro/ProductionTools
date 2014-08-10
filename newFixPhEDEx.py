@@ -31,7 +31,7 @@ getQuery = """
            """
 
 setQuery = """
-           UPDATE dbsbuffer_file set in_phedex = 1 where lfn = :lfn
+           UPDATE dbsbuffer_file SET in_phedex = 1 WHERE lfn = :lfn
            """
 
 ### TODO: organize this messs
@@ -67,7 +67,7 @@ def main():
 
     ## TASK3: build uniq dataset names and check whether PhEDEx and DBS contain
     ## the same number of files. If so, then those lfns are healthy
-    print "Checking dataset status in both PhEDEx and DBS ..."
+    print "Checking %d dataset in both PhEDEx and DBS ..." % len(reducedLfns)
     crippleLfns, healthyLfns = [], []
     for lfn in reducedLfns:
         lfnAux = lfn.split ('/')
@@ -100,7 +100,7 @@ def main():
             #filesToCheck = [file for file in fileList if lfn in file]
             for file in fileList:
                 if lfn in file:
-                    filesToCheck.append(lfn)
+                    filesToCheck.append(file)
     else:
         filesToCheck = []
     if healthyLfns:
@@ -109,19 +109,19 @@ def main():
             #filesInPhedex = [file for file in fileList if lfn in file]
             for file in fileList:
                 if lfn in file:
-                    filesInPhedex.append(lfn)
+                    filesInPhedex.append(file)
     else:
         filesInPhedex = []
 
-    ## TASK5: query PhEDEx for each cripple lfn (filesToCheck)
-    ## and build the final lfn lists
+    ## TASK5: query PhEDEx for each cripple file (filesToCheck)
+    ## and build the final file lists
     missingFiles = []
-    for lfn in filesToCheck:
-        result = myPhEDEx._getResult('data', args = {'file' : lfn}, verb = 'GET')
+    for file in filesToCheck:
+        result = myPhEDEx._getResult('data', args = {'file' : file}, verb = 'GET')
         if len(result['phedex']['dbs']):
-            filesInPhedex.append(lfn)
+            filesInPhedex.append(file)
         else:
-            missingFiles.append(lfn)
+            missingFiles.append(file)
 
     if not filesInPhedex:
         print "There are no files to be updated in the buffer. Contact a developer."
@@ -129,14 +129,19 @@ def main():
         subprocess.call([os.environ['manage'], "execute-agent", "wmcoreD", "--start",
                      "--component=PhEDExInjector"], stdout=open(os.devnull, 'wb'))
         return 0
-    print "Found %d files that are already registered in PhEDEx but buffer doesn't know" % len(filesInPhedex)
+    print "Found %d out of %d files that are already registered in PhEDEx \
+           but buffer doesn't know" % (len(filesInPhedex), len(fileList))
     print "Fixing them now, it may take several minutes ..."
 
     ## TASK6: time to actually fix these files
     binds = []
-    for lfn in filesInPhedex:
-        binds.append({'lfn': lfn})
-    formatter.dbi.processData(setQuery, binds)
+    for file in filesInPhedex:
+        binds.append({'lfn': file})
+    formatter.dbi.processData(setQuery, binds,
+                              conn = None,
+                              transaction = False,
+                              returnCursor = False)
+
     print "Rows were successfully updated! Good job!"
     print "Starting PhEDExInjector now ..."
     subprocess.call([os.environ['manage'], "execute-agent", "wmcoreD", "--start",
