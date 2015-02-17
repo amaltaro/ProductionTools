@@ -27,7 +27,7 @@ except ImportError:
 
 getQuery = """
            SELECT lfn FROM dbsbuffer_file WHERE in_phedex = 0 AND 
-           (lfn NOT LIKE '%unmerged%' AND lfn NOT LIKE 'MCFakeFile%')
+           (lfn NOT LIKE '%%unmerged%' AND lfn NOT LIKE 'MCFakeFile%%')
            """
 
 setQuery = """
@@ -70,28 +70,30 @@ def main():
     print "Checking %d dataset in both PhEDEx and DBS ..." % len(reducedLfns)
     crippleLfns, healthyLfns = [], []
     for lfn in reducedLfns:
-        lfnAux = lfn.split ('/')
-        dset = '/'+lfnAux[4]+'/'+lfnAux[3]+'-'+lfnAux[6]+'/'+lfnAux[5]
-        result = myPhEDEx._getResult('blockreplicas', args = {'dataset' : dset}, verb = 'GET')
-        phedexFiles = 0
-        for item in result["phedex"]["block"]:
-            phedexFiles += item['files']
-
-        ## TODO: ValidFile is only available for > 0.9.95pre5. Once all agents are
-        ## upgraded, then we can start using this new query.
-        #result = myDBS.listDatasetFileDetails(dset)
-        #dbsFiles = 0
-        #for item in result.itervalues():
-        #    dbsFiles += 1 if item['ValidFile'] else 0
-
-        # This call returns valid+invalid number of filesfiles
-        result = myDBS.listDatasetFiles(dset)
-        dbsFiles = len(result)
-        if phedexFiles == dbsFiles:
-            healthyLfns.append(lfn)
-        else:
-            crippleLfns.append(lfn)
-
+        try:
+            lfnAux = lfn.split ('/')
+            dset = '/'+lfnAux[4]+'/'+lfnAux[3]+'-'+lfnAux[6]+'/'+lfnAux[5]
+            result = myPhEDEx._getResult('blockreplicas', args = {'dataset' : dset}, verb = 'GET')
+            phedexFiles = 0
+            for item in result["phedex"]["block"]:
+                phedexFiles += item['files']
+    
+            ## TODO: ValidFile is only available for > 0.9.95pre5. Once all agents are
+            ## upgraded, then we can start using this new query.
+            #result = myDBS.listDatasetFileDetails(dset)
+            #dbsFiles = 0
+            #for item in result.itervalues():
+            #    dbsFiles += 1 if item['ValidFile'] else 0
+    
+            # This call returns valid+invalid number of filesfiles
+            result = myDBS.listDatasetFiles(dset)
+            dbsFiles = len(result)
+            if phedexFiles == dbsFiles:
+                healthyLfns.append(lfn)
+            else:
+                crippleLfns.append(lfn)
+        except:
+            print "Error with:",lfn
     ## TASK4: map the short cripple and healthy lists to the full original lfns
     ## TODO: this code looks terrible... IMPROVE IT!
     if crippleLfns:
