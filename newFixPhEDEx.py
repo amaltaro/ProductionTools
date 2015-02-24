@@ -27,7 +27,7 @@ except ImportError:
 
 getQuery = """
            SELECT lfn FROM dbsbuffer_file WHERE in_phedex = 0 AND 
-           (lfn NOT LIKE '%%unmerged%%' AND lfn NOT LIKE 'MCFakeFile%%')
+           (lfn NOT LIKE '%%unmerged%%' AND lfn NOT LIKE 'MCFakeFile%%' AND lfn NOT LIKE '/store/user%%')
            """
 
 setQuery = """
