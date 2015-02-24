@@ -118,6 +118,8 @@ def main():
     ## TASK5: query PhEDEx for each cripple file (filesToCheck)
     ## and build the final file lists
     missingFiles = []
+    i = 0
+    n = len(filesToCheck)
     for file in filesToCheck:
         try:
             result = myPhEDEx._getResult('data', args = {'file' : file}, verb = 'GET')
@@ -127,6 +129,9 @@ def main():
                 missingFiles.append(file)
         except:
             print "Error contacting Phedex", file
+        i += 1
+        if i % 100 == 0:
+            print '%d/%d files processed'%(i,n)
 
     if not filesInPhedex:
         print "There are no files to be updated in the buffer. Contact a developer."
