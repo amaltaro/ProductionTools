@@ -119,11 +119,14 @@ def main():
     ## and build the final file lists
     missingFiles = []
     for file in filesToCheck:
-        result = myPhEDEx._getResult('data', args = {'file' : file}, verb = 'GET')
-        if len(result['phedex']['dbs']):
-            filesInPhedex.append(file)
-        else:
-            missingFiles.append(file)
+        try:
+            result = myPhEDEx._getResult('data', args = {'file' : file}, verb = 'GET')
+            if len(result['phedex']['dbs']):
+                filesInPhedex.append(file)
+            else:
+                missingFiles.append(file)
+        except:
+            print "Error contacting Phedex", file
 
     if not filesInPhedex:
         print "There are no files to be updated in the buffer. Contact a developer."
