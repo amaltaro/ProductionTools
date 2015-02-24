@@ -69,6 +69,8 @@ def main():
     ## the same number of files. If so, then those lfns are healthy
     print "Checking %d dataset in both PhEDEx and DBS ..." % len(reducedLfns)
     crippleLfns, healthyLfns = [], []
+    i = 0
+    n = len(reducedLfns)
     for lfn in reducedLfns:
         try:
             lfnAux = lfn.split ('/')
@@ -94,6 +96,9 @@ def main():
                 crippleLfns.append(lfn)
         except:
             print "Error with:",lfn
+        i += 1:
+        if i % 100 == 0:
+            print '%d/%d files processed'%(i,n) 
     ## TASK4: map the short cripple and healthy lists to the full original lfns
     ## TODO: this code looks terrible... IMPROVE IT!
     if crippleLfns:
