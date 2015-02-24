@@ -27,7 +27,7 @@ except ImportError:
 
 getQuery = """
            SELECT lfn FROM dbsbuffer_file WHERE in_phedex = 0 AND 
-           (lfn NOT LIKE '%%unmerged%' AND lfn NOT LIKE 'MCFakeFile%%')
+           (lfn NOT LIKE '%%unmerged%%' AND lfn NOT LIKE 'MCFakeFile%%' AND lfn NOT LIKE '/store/user%%')
            """
 
 setQuery = """
@@ -69,6 +69,8 @@ def main():
     ## the same number of files. If so, then those lfns are healthy
     print "Checking %d dataset in both PhEDEx and DBS ..." % len(reducedLfns)
     crippleLfns, healthyLfns = [], []
+    i = 0
+    n = len(reducedLfns)
     for lfn in reducedLfns:
         try:
             lfnAux = lfn.split ('/')
@@ -94,6 +96,9 @@ def main():
                 crippleLfns.append(lfn)
         except:
             print "Error with:",lfn
+        i += 1
+        if i % 100 == 0:
+            print '%d/%d files processed'%(i,n) 
     ## TASK4: map the short cripple and healthy lists to the full original lfns
     ## TODO: this code looks terrible... IMPROVE IT!
     if crippleLfns:
@@ -118,12 +123,20 @@ def main():
     ## TASK5: query PhEDEx for each cripple file (filesToCheck)
     ## and build the final file lists
     missingFiles = []
+    i = 0
+    n = len(filesToCheck)
     for file in filesToCheck:
-        result = myPhEDEx._getResult('data', args = {'file' : file}, verb = 'GET')
-        if len(result['phedex']['dbs']):
-            filesInPhedex.append(file)
-        else:
-            missingFiles.append(file)
+        try:
+            result = myPhEDEx._getResult('data', args = {'file' : file}, verb = 'GET')
+            if len(result['phedex']['dbs']):
+                filesInPhedex.append(file)
+            else:
+                missingFiles.append(file)
+        except:
+            print "Error contacting Phedex", file
+        i += 1
+        if i % 100 == 0:
+            print '%d/%d files processed'%(i,n)
 
     if not filesInPhedex:
         print "There are no files to be updated in the buffer. Contact a developer."
