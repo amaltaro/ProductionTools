@@ -96,7 +96,7 @@ def main():
                 crippleLfns.append(lfn)
         except:
             print "Error with:",lfn
-        i += 1:
+        i += 1
         if i % 100 == 0:
             print '%d/%d files processed'%(i,n) 
     ## TASK4: map the short cripple and healthy lists to the full original lfns
