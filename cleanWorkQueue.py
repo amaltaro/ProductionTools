@@ -3,9 +3,8 @@ __cleanWorkQueue.py__
 
 This script will look for requests in final status and will
 check whether:
- 1. its spec document has been deleted
- 2. its workqueue docs have been deleted
- 3. its workqueue_inbox doc has been deleted
+ 1. its workqueue docs have been deleted (in central couch)
+ 2. its workqueue_inbox doc has been deleted (in central couch)
 
 In case it finds these documents, then it will ask for their deletion.
 
@@ -24,7 +23,7 @@ from WMCore.WorkQueue.WorkQueueBackend import WorkQueueBackend
 
 #TODO: set all these statuses back when testing is finished 
 # final_status = ['aborted', 'rejected', 'aborted-completed', 'aborted-archived']
-final_status = ['aborted']
+final_status = ['completed']
 
 # TODO: fix the deletion of the spec file
 # TODO: implement deletion when there is no input workflow
@@ -43,17 +42,19 @@ def main():
     config = loadConfigurationFile(os.environ["WMAGENT_CONFIG"])
 
     # Instantiating central services (couch stuff)
-    print "Central Couch URL  : %s" % config.WorkloadSummary.couchurl
-    print "Central ReqMgr URL  : %s\n" % config.AnalyticsDataCollector.centralRequestDBURL
+#    print "Central Couch URL  : %s" % config.WorkloadSummary.couchurl
+#    print "Central ReqMgr URL  : %s\n" % config.AnalyticsDataCollector.centralRequestDBURL
 
     wfDBReader = RequestDBReader(config.AnalyticsDataCollector.centralRequestDBURL, 
                                  couchapp = config.AnalyticsDataCollector.RequestCouchApp)
 
-    specDB = Database('reqmgr_workload_cache', config.WorkloadSummary.couchurl)
-
+    # Central services
     wqBackend = WorkQueueBackend(config.WorkloadSummary.couchurl)
-
     wqInboxDB = Database('workqueue_inbox', config.WorkloadSummary.couchurl)
+
+    # Local services
+    localWQBackend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name = "workqueue_inbox")
+    localWQInboxDB = Database('workqueue', config.WorkQueueManager.couchurl)
 
     for stat in final_status:
         # retrieve list of workflows in each status
@@ -66,12 +67,6 @@ def main():
             print "Checking %s with status '%s'." % (wfName, wfDoc[wfName]['RequestStatus'])
 
         for wf in finalWfs:
-            # check whether spec file exist
-            if specDB.documentExists(wf):
-                print "Found spec file for %s" % wf
-                # then retrieve the document
-                specDoc = specDB.document(wf)
-
             # check whether there are workqueue docs
             wqDocIDs = wqBackend.getElements(WorkflowName = wf)
             if wqDocIDs:
@@ -83,16 +78,18 @@ def main():
                 # then retrieve the document
                 wqInboxDoc = wqInboxDB.document(wf)
 
+            # check local queue
+            wqDocIDs = localWQBackend.getElements(WorkflowName = wf)
+            if wqDocIDs:
+                print "Found %d local workqueue_inbox docs for %s" % (len(wqDocIDs), wf)
+            if localWQInboxDB.documentExists(wf):
+                print "Found local workqueue doc for %s" % wf
+
+
     # TODO TODO TODO for the moment only deletes for a specific workflow
     if wfName:
-        var = raw_input("\nCan we delete all these documents (Y/N)? ")
+        var = "N" #raw_input("\nCan we delete all these documents (Y/N)? ")
         if var == "Y":
-            # deletes spec file
-            # TODO that is WRONG!!!! I cannot delete this document, only the /spec one
-#           if specDoc:
-#                print "Deleting spec id %s and %s" % (specDoc['_id'], specDoc['_rev'])
-#                specDB.delete_doc(specDoc['_id'], specDoc['_rev'])
-
             # deletes workqueue_inbox doc
             if wqInboxDoc:
                 print "Deleting workqueue_inbox id %s and %s" % (wqInboxDoc['_id'], wqInboxDoc['_rev'])
@@ -103,7 +100,7 @@ def main():
                 print "Deleting workqueue docs %s" % wqDocIDs
                 wqBackend.deleteElements(*[x for x in wqDocIDs if x['RequestName'] in wfName])
         else:
-            print "You are the boss, aborting it ..."
+            print "You are the boss, aborting it ...\n"
 
 if __name__ == "__main__":
     sys.exit(main())
