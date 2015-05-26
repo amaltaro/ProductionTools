@@ -75,9 +75,11 @@ def main():
             print "Found %d wfs in not in active state" % len(finalWfs)
         else:
             finalWfs = [wfName]
-            wfDoc = wfDBReader.getRequestByNames(wfName, True)
-            print "Checking %s with status '%s'." % (wfName, wfDoc[wfName]['RequestStatus'])
+            tempWfs = wfDBReader.getRequestByNames(wfName, True)
+            print "Checking %s with status '%s'." % (wfName, tempWfs[wfName]['RequestStatus'])
 
+        wqDocs, wqInboxDocs = [], []
+        localWQDocs, localWQInboxDocs = [], []
         for counter, wf in enumerate(finalWfs):
             if counter % 100 == 0:
                 print "%d wfs queried ..." % counter
@@ -85,24 +87,31 @@ def main():
             wqDocIDs = wqBackend.getElements(WorkflowName = wf)
             if wqDocIDs:
                 print "Found %d workqueue docs for %s, status %s" % (len(wqDocIDs), wf, tempWfs[wf]['RequestStatus'])
+                print wqDocIDs
+                wqDocs.append(wqDocIDs)
 
             # check whether there are workqueue_inbox docs
             if wqInboxDB.documentExists(wf):
                 print "Found workqueue_inbox doc for %s, status %s" % (wf, tempWfs[wf]['RequestStatus'])
                 # then retrieve the document
                 wqInboxDoc = wqInboxDB.document(wf)
+                wqInboxDocs.append(wqInboxDoc)
 
             # check local queue
             wqDocIDs = localWQBackend.getElements(WorkflowName = wf)
             if wqDocIDs:
-                print "Found %d local workqueue_inbox docs for %s, status %s" % (len(wqDocIDs), wf, tempWfs[wf]['RequestStatus'])
+                print "Found %d local workqueue docs for %s, status %s" % (len(wqDocIDs), wf, tempWfs[wf]['RequestStatus'])
+                print wqDocIDs
+                localWQDocs.append(wqDocIDs)
             if localWQInboxDB.documentExists(wf):
-                print "Found local workqueue doc for %s, status %s" % (wf, tempWfs[wf]['RequestStatus'])
-
+                print "Found local workqueue_inbox doc for %s, status %s" % (wf, tempWfs[wf]['RequestStatus'])
+                wqInboxDoc = localWQInboxDB.document(wf)
+                print wqInboxDoc
+                localWQInboxDocs.append(wqInboxDoc)
 
     # TODO TODO TODO for the moment only deletes for a specific workflow
     if wfName:
-        var = "N" #raw_input("\nCan we delete all these documents (Y/N)? ")
+        var = raw_input("\nCan we delete all these documents (Y/N)? ")
         if var == "Y":
             # deletes workqueue_inbox doc
             if wqInboxDoc:
