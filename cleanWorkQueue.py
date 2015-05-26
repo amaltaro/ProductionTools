@@ -56,34 +56,48 @@ def main():
     localWQBackend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name = "workqueue_inbox")
     localWQInboxDB = Database('workqueue', config.WorkQueueManager.couchurl)
 
+    statusList = ["failed", "epic-FAILED", "completed", "closed-out",
+                  "announced", "aborted", "aborted-completed", "rejected",
+                  "normal-archived", "aborted-archived", "rejected-archived"]
+
     for stat in final_status:
         # retrieve list of workflows in each status
         if not wfName:
-            finalWfs = wfDBReader.getRequestByStatus([stat])
-            print "Found %d wfs in status: %s" %(len(finalWfs), stat)
+#            options = {'include_docs': False}
+            date_range = {'startkey': [2015,5,15,0,0,0], 'endkey': [2015,5,26,0,0,0]}
+#            finalWfs = wfDBReader.getRequestByCouchView("bydate", options, date_range)
+            tempWfs = wfDBReader.getRequestByCouchView("bydate", date_range)
+            #print "Found %d wfs in status: %s" %(len(finalWfs), stat)
+            finalWfs = []
+            for wf, content in tempWfs.iteritems():
+                if content['RequestStatus'] in statusList:
+                  finalWfs.append(wf)
+            print "Found %d wfs in not in active state" % len(finalWfs)
         else:
             finalWfs = [wfName]
             wfDoc = wfDBReader.getRequestByNames(wfName, True)
             print "Checking %s with status '%s'." % (wfName, wfDoc[wfName]['RequestStatus'])
 
-        for wf in finalWfs:
+        for counter, wf in enumerate(finalWfs):
+            if counter % 100 == 0:
+                print "%d wfs queried ..." % counter
             # check whether there are workqueue docs
             wqDocIDs = wqBackend.getElements(WorkflowName = wf)
             if wqDocIDs:
-                print "Found %d workqueue docs for %s" % (len(wqDocIDs), wf)
+                print "Found %d workqueue docs for %s, status %s" % (len(wqDocIDs), wf, tempWfs[wf]['RequestStatus'])
 
             # check whether there are workqueue_inbox docs
             if wqInboxDB.documentExists(wf):
-                print "Found workqueue_inbox doc for %s" % wf
+                print "Found workqueue_inbox doc for %s, status %s" % (wf, tempWfs[wf]['RequestStatus'])
                 # then retrieve the document
                 wqInboxDoc = wqInboxDB.document(wf)
 
             # check local queue
             wqDocIDs = localWQBackend.getElements(WorkflowName = wf)
             if wqDocIDs:
-                print "Found %d local workqueue_inbox docs for %s" % (len(wqDocIDs), wf)
+                print "Found %d local workqueue_inbox docs for %s, status %s" % (len(wqDocIDs), wf, tempWfs[wf]['RequestStatus'])
             if localWQInboxDB.documentExists(wf):
-                print "Found local workqueue doc for %s" % wf
+                print "Found local workqueue doc for %s, status %s" % (wf, tempWfs[wf]['RequestStatus'])
 
 
     # TODO TODO TODO for the moment only deletes for a specific workflow
