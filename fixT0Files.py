@@ -49,8 +49,7 @@ def main():
     inputFile = args[0]
     with open(inputFile) as f:
         listWorkflows = [x.rstrip('\n') for x in f.readlines()]
-    print listWorkflows
-    print "WTF"
+
     connectToDB()
     myThread = threading.currentThread()
     formatter = DBFormatter(logging, myThread.dbi)
@@ -63,12 +62,15 @@ def main():
     # Get all the files available for each subscription
     for sub in unfSubs:
         availFiles = formatter.formatDict(myThread.dbi.processData(getFilesAvailable, [sub]))
-        print "Files available for sub %s: %s" % (sub, len(availFiles))
+        print "Files available for sub %s: %s" % (sub['subid'], len(availFiles))
 
         availLocation = formatter.formatDict(myThread.dbi.processData(getFileLocation, [sub]))
-        print "Files available with location for sub %s: %s" % (sub, len(availLocation))
+        print "Files available with location for sub %s: %s" % (sub['subid'], len(availLocation))
 
         if len(availFiles) and not len(availLocation):
+            var = raw_input("Please confirm you want to mark them as failed (y/n): ")
+            if var != 'y':
+                break
             # then we have to mark this file as failed
             _ = [x.update(sub) for x in availFiles]
             print "Failing the following: %s" % availFiles
