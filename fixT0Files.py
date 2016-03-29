@@ -10,27 +10,22 @@ except ImportError:
     print "source /data/srv/wmagent/current/apps/wmagent/etc/profile.d/init.sh"
     sys.exit(1)
 
-getUnfinishedSubs = """
-                    SELECT wmbs_subscription.id AS subId FROM wmbs_workflow 
-                      INNER JOIN wmbs_subscription ON wmbs_workflow.id=wmbs_subscription.workflow
-                      INNER JOIN wmbs_fileset ON wmbs_subscription.fileset=wmbs_fileset.id
-                    WHERE wmbs_subscription.finished=0 and wmbs_workflow.name= :workflow
-                    """
 
 getFilesAvailable = """
-                   SELECT wmbs_sub_files_available.fileid AS fileid FROM wmbs_sub_files_available
-                     WHERE wmbs_sub_files_available.subscription = :subId
-                   """
+                    SELECT wsfa.fileid FROM wmbs_sub_files_available wsfa
+                      LEFT OUTER JOIN wmbs_file_location wfl ON wsfa.fileid = wfl.fileid
+                      WHERE wfl.fileid is null
+                    """
 
-getFileLocation = """
-                  SELECT wmbs_sub_files_available.fileid, wls.se_name AS pnn
-                    FROM wmbs_sub_files_available
-                    INNER JOIN wmbs_file_location ON
-                      wmbs_sub_files_available.fileid = wmbs_file_location.fileid
-                    INNER JOIN wmbs_location_senames wls ON
-                      wmbs_file_location.location = wls.location
-                  WHERE wmbs_sub_files_available.subscription = :subId
+
+getCERNLocation = """
+                  SELECT location FROM wmbs_location_senames where se_name = 'T0_CH_CERN_Disk'
                   """
+
+
+updateFileLocation = """
+                     INSERT INTO wmbs_file_location (fileid, location) VALUES (:fileid, :location)
+                     """
 
 
 def main():
@@ -42,44 +37,29 @@ def main():
     if 'manage' not in os.environ:
         os.environ['manage'] = '/data/srv/wmagent/current/config/wmagent/manage'
 
-    args = sys.argv[1:]
-    if not len(args) == 1:
-        print "usage: python fixT0Files.py <text_file_with_the_workflow_names>"
-        sys.exit(0)
-    inputFile = args[0]
-    with open(inputFile) as f:
-        listWorkflows = [x.rstrip('\n') for x in f.readlines()]
-
     connectToDB()
     myThread = threading.currentThread()
     formatter = DBFormatter(logging, myThread.dbi)
 
-    # Get all the unfinished subscriptions for a given workflow
-    binds = [{'workflow': wf} for wf in listWorkflows]
-    unfSubs = formatter.formatDict(myThread.dbi.processData(getUnfinishedSubs, binds))
-    print "Unfinished subscriptions: %s" % unfSubs
-
     # Get all the files available for each subscription
-    for sub in unfSubs:
-        availFiles = formatter.formatDict(myThread.dbi.processData(getFilesAvailable, [sub]))
-        print "Files available for sub %s: %s" % (sub['subid'], len(availFiles))
+    print "Getting files available without location..."
+    availFiles = formatter.formatDict(myThread.dbi.processData(getFilesAvailable))
+    print "Total files available: %s" % len(availFiles)
+    uniqAvailFiles = list(set([x['fileid'] for x in availFiles]))
+    availFiles = [{'fileid': x} for x in uniqAvailFiles]
+    print "Total unique files available: %s" % len(uniqAvailFiles)
 
-        availLocation = formatter.formatDict(myThread.dbi.processData(getFileLocation, [sub]))
-        print "Files available with location for sub %s: %s" % (sub['subid'], len(availLocation))
+    cernID = formatter.formatDict(myThread.dbi.processData(getCERNLocation))[0]
+    print "CERN location id: %s" % cernID
+    if not cernID:
+        print "You need to add T0_CH_CERN to the resource control db"
+        sys.exit(1)
 
-        if len(availFiles) and not len(availLocation):
-            var = raw_input("Please confirm you want to mark them as failed (y/n): ")
-            if var != 'y':
-                break
-            # then we have to mark this file as failed
-            _ = [x.update(sub) for x in availFiles]
-            print "Failing the following: %s" % availFiles
-            myThread.dbi.processData("INSERT INTO wmbs_sub_files_failed (subscription, fileid) VALUES (:subId, :fileid)", availFiles)
-            myThread.dbi.processData("DELETE FROM wmbs_sub_files_available WHERE subscription = :subId AND fileid = :fileid", availFiles)
-            myThread.dbi.processData("DELETE FROM wmbs_sub_files_acquired WHERE subscription = :subId AND fileid = :fileid", availFiles)
-            myThread.dbi.processData("DELETE FROM wmbs_sub_files_complete WHERE subscription = :subId AND fileid = :fileid", availFiles)
-            print "Subscription %s got %d files moved to failed" % (sub['subid'], len(availFiles)) 
+    for fid in availFiles:
+        fid.update(cernID)
 
+    myThread.dbi.processData(updateFileLocation, availFiles)
+    print "Done!"
     sys.exit(0)
 
 
