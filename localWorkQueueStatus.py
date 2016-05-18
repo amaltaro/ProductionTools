@@ -11,14 +11,21 @@ Created on Apr 27, 2015.
 import sys
 import os
 import logging
+import argparse
 from pprint import pformat
 
 from WMCore.Configuration import loadConfigurationFile
 from WMCore.WorkQueue.WorkQueueBackend import WorkQueueBackend
 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+parser = argparse.ArgumentParser(description="Local workqueue monitoring")
+parser.add_argument('-v', '--verbose', help='Increase output verbosity', action='store_true')
+args = parser.parse_args()
+
+if args.verbose:
+    logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.INFO)
 
 
 def createElementsSummary(allElements, dbName):
@@ -29,8 +36,8 @@ def createElementsSummary(allElements, dbName):
     for elem in allElements:
         summary.setdefault(elem['Status'], 0)
         summary[elem['Status']] += 1
-    logger.info("Found a total of %d elements in the '%s' db", len(allElements), dbName)
-    logger.info(pformat(summary))
+    logging.info("Found a total of %d elements in the '%s' db", len(allElements), dbName)
+    logging.info(pformat(summary))
     return summary.keys()
 
 
@@ -46,23 +53,23 @@ def byStatusSummary(elemByStatus, localWQInboxDB=None):
     for elem in elemByStatus:
         if elem.get('NoLocationUpdate'):
             commonSites = set(elem['SiteWhitelist'])
-            logger.debug("NoLocationUpdate element assigned to %s", commonSites)
+            logging.debug("NoLocationUpdate element assigned to %s", commonSites)
         elif elem['NoInputUpdate'] and elem['NoPileupUpdate']:
             commonSites = set(elem['SiteWhitelist'])
-            logger.debug("NoInputUpdate AND NoPileupUpdate element assigned to %s", commonSites)
+            logging.debug("NoInputUpdate AND NoPileupUpdate element assigned to %s", commonSites)
         elif elem['NoInputUpdate']:
             puSites = elem['PileupData'].values()[0] if elem['PileupData'] else elem['SiteWhitelist']
             commonSites = set(puSites) & set(elem['SiteWhitelist'])
-            logger.debug("NoInputUpdate element with pileup location and sitewhitelist intersection as: %s", commonSites)
+            logging.debug("NoInputUpdate element with pileup location and sitewhitelist intersection as: %s", commonSites)
         elif elem['NoPileupUpdate']:
             inputSites = elem['Inputs'].values()[0] if elem['Inputs'] else elem['SiteWhitelist']
             commonSites = set(inputSites) & set(elem['SiteWhitelist'])
-            logger.debug("NoPileupUpdate element with input location and sitewhitelist intersection as: %s", commonSites)
+            logging.debug("NoPileupUpdate element with input location and sitewhitelist intersection as: %s", commonSites)
         else:
             inputSites = elem['Inputs'].values()[0] if elem['Inputs'] else elem['SiteWhitelist']
             puSites = elem['PileupData'].values()[0] if elem['PileupData'] else elem['SiteWhitelist']
             commonSites = set(inputSites) & set(puSites) & set(elem['SiteWhitelist'])
-            logger.debug("NoPileupUpdate element with input location and sitewhitelist intersection as: %s", commonSites)
+            logging.debug("Unflagged element with input location and sitewhitelist intersection as: %s", commonSites)
 
         if not commonSites:
             workOverview['totalBadJobs'] += elem['Jobs']
@@ -92,15 +99,14 @@ def byStatusSummary(elemByStatus, localWQInboxDB=None):
                 #    logging.info("%s, id %s with %d jobs to process", elem['RequestName'], elem.id, elem['Jobs'])
 
     # Report on site vs jobs vs elements situation
-    #logger.info("AGENT OVERVIEW: %s\n", pformat(workOverview))
-    logger.info("Average of jobs per site (equally divides jobs among the common sites):\n%s\n", pformat(workSplitBySite))
-    logger.info("Jobs per site (do not divide jobs among the common sites):\n%s\n", pformat(workBySite))
+    logging.info("Average of jobs per site (equally divides jobs among the common sites):\n%s\n", pformat(workSplitBySite))
+    logging.info("Jobs per site (do not divide jobs among the common sites):\n%s\n", pformat(workBySite))
 
     if elemByStatus[0]['Status'] == 'Available':
-        logger.info("Found %d elements stuck in Available in local workqueue with no common site/data location:", len(stuckElements))
+        logging.info("Found %d elements stuck in Available in local workqueue with no common site/data location:", len(stuckElements))
         for elem in stuckElements:
-            logger.info("    %s with docid %s", elem['RequestName'], elem['id'])
-        logger.debug(pformat(stuckElements))
+            logging.info("    %s with docid %s", elem['RequestName'], elem['id'])
+        logging.debug(pformat(stuckElements))
 
 
 def main():
@@ -122,7 +128,7 @@ def main():
     foundStatus = createElementsSummary(wqInboxDocIDs, 'workqueue_inbox')
     foundStatus = createElementsSummary(wqDocIDs, 'workqueue')
 
-    # Now investigate only Available docs in the workqueue database
+    # Now investigate docs in the workqueue database
     for status in foundStatus:
         logging.info("\n************* workqueue elements summary by status: %s ************", status)
         elemByStatus = [x for x in wqDocIDs if x['Status'] == status]
