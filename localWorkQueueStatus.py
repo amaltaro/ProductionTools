@@ -82,8 +82,9 @@ def byStatusSummary(elemByStatus, localWQInboxDB=None):
                         'PileupData': elem['PileupData'].values()[0] if elem['PileupData'] else [],
                         'SiteWhitelist': elem['SiteWhitelist']}
             # now get the location where it was supposed to be
-            inboxDoc = localWQInboxDB.getElements(elementIDs=[elem.id])[0]
-            tempElem['OriginalInputLocation'] = inboxDoc['Inputs']
+            if localWQInboxDB:
+                inboxDoc = localWQInboxDB.getElements(elementIDs=[elem.id])[0]
+                tempElem['OriginalInputLocation'] = inboxDoc['Inputs']
             stuckElements.append(tempElem)
         else:
             workOverview['totalGoodJobs'] += elem['Jobs']
@@ -101,7 +102,7 @@ def byStatusSummary(elemByStatus, localWQInboxDB=None):
     logging.info("Average number of UNIQUE jobs per site:\n%s\n", pformat(workSplitBySite))
     logging.info("Maximum number of POSSIBLE jobs per site:\n%s\n", pformat(workBySite))
 
-    if elemByStatus[0]['Status'] == 'Available':
+    if elemByStatus[0]['Status'] == 'Available' and localWQInboxDB:
         logging.info("Found %d elements stuck in Available in local workqueue with no common site/data location:", len(stuckElements))
         for elem in stuckElements:
             logging.info("  %s with docid %s, site whitelist set to %s while input %s only available at %s", elem['RequestName'],
@@ -127,7 +128,7 @@ def main():
     wqInboxDocIDs = localWQInboxDB.getElements()
 
     # Build and print a summary of these elements
-    logging.info("************* workqueue elements summary ************")
+    logging.info("************* LOCAL workqueue elements summary ************")
     foundStatus = createElementsSummary(wqInboxDocIDs, 'workqueue_inbox')
     foundStatus = createElementsSummary(wqDocIDs, 'workqueue')
 
@@ -137,6 +138,14 @@ def main():
         elemByStatus = [x for x in wqDocIDs if x['Status'] == status]
         byStatusSummary(elemByStatus, localWQInboxDB=localWQInboxDB)
 
+    # time to look up at central global queue
+    logging.info("\n************* GLOBAL workqueue elements summary ************")
+    globalWQBackend = WorkQueueBackend(config.WorkloadSummary.couchurl, db_name="workqueue")
+    gqDocIDs = globalWQBackend.getElements(status='Available')
+    _ = createElementsSummary(gqDocIDs, 'workqueue')
+    #logging.info("Found %d 'Available' docs in global workqueue database", len(gqDocIDs))
+    byStatusSummary(gqDocIDs)
+    
     sys.exit(0)
 
 if __name__ == "__main__":
