@@ -76,7 +76,6 @@ def byStatusSummary(elemByStatus, localWQInboxDB=None):
             workOverview['totalAvailableBadLQE'] += 1
             tempElem = {'RequestName': elem['RequestName'],
                         'id': elem.id,
-                        'NoLocationUpdate': elem.get('NoLocationUpdate'),
                         'NoInputUpdate': elem['NoInputUpdate'],
                         'NoPileupUpdate': elem['NoPileupUpdate'],
                         'Inputs': elem['Inputs'].values()[0] if elem['Inputs'] else [],
@@ -99,14 +98,18 @@ def byStatusSummary(elemByStatus, localWQInboxDB=None):
                 #    logging.info("%s, id %s with %d jobs to process", elem['RequestName'], elem.id, elem['Jobs'])
 
     # Report on site vs jobs vs elements situation
-    logging.info("Average of jobs per site (equally divides jobs among the common sites):\n%s\n", pformat(workSplitBySite))
-    logging.info("Jobs per site (do not divide jobs among the common sites):\n%s\n", pformat(workBySite))
+    logging.info("Average number of UNIQUE jobs per site:\n%s\n", pformat(workSplitBySite))
+    logging.info("Maximum number of POSSIBLE jobs per site:\n%s\n", pformat(workBySite))
 
     if elemByStatus[0]['Status'] == 'Available':
         logging.info("Found %d elements stuck in Available in local workqueue with no common site/data location:", len(stuckElements))
         for elem in stuckElements:
-            logging.info("    %s with docid %s", elem['RequestName'], elem['id'])
-        logging.debug(pformat(stuckElements))
+            logging.info("  %s with docid %s, site whitelist set to %s while input %s only available at %s", elem['RequestName'],
+                                                                                                             elem['id'],
+                                                                                                             elem['SiteWhitelist'],
+                                                                                                             elem['OriginalInputLocation'].keys(),
+                                                                                                             elem['Inputs'])
+        logging.debug("%s\n", pformat(stuckElements))
 
 
 def main():
