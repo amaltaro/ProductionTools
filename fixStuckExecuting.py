@@ -47,48 +47,12 @@ updateState = """
 
 
 CACHE_STATUS = {'fabozzi_HIRun2015-HIMinimumBias5-02May2016_758p4_160502_172625_4322': u'running-closed',
- 'pdmvserv_BPH-RunIISummer15GS-00073_00378_v0__160617_003301_5151': u'running-closed',
- 'pdmvserv_BPH-RunIISummer15GS-00074_00378_v0__160617_003320_571': u'running-closed',
- 'pdmvserv_BPH-Summer12-00203_00262_v0__160617_004010_4907': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00120_00094_v0__160623_125059_340': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00122_00094_v0__160623_125031_7227': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00135_00095_v0__160623_125340_8771': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00152_00097_v0__160624_050737_8732': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00158_00095_v0__160623_125840_5079': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00166_00095_v0__160623_130011_549': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00253_00102_v0__160624_142220_8472': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00566_00083_v0__160622_180022_4786': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00582_00084_v0__160622_180650_1987': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00718_00085_v0__160622_182152_5466': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00742_00085_v0__160622_183733_4944': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00760_00086_v0__160622_184533_1228': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00845_00089_v0__160622_191239_4196': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00856_00089_v0__160622_191544_3744': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00910_00099_v0__160624_125206_2898': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00937_00100_v0__160624_125807_1647': u'running-closed',
- 'pdmvserv_EXO-RunIISummer15wmLHEGS-00969_00101_v0__160624_130733_5683': u'running-closed',
- 'pdmvserv_JME-RunIISpring16DR80-00006_00369_v0_NZS_160611_055903_7220': u'normal-archived',
- 'pdmvserv_SMP-RunIISummer15wmLHEGS-00021_00058_v0__160601_170948_1091': u'running-closed',
- 'pdmvserv_TOP-RunIISummer15wmLHEGS-00009_00068_v0__160609_042535_4109': u'aborted-archived',
- 'pdmvserv_task_BTV-RunIISpring16DR80-00038__v1_T_160516_093427_2240': u'normal-archived',
- 'pdmvserv_task_EXO-RunIISpring16DR80-01891__v1_T_160607_063010_9581': u'running-closed',
- 'pdmvserv_task_EXO-RunIISpring16DR80-01897__v1_T_160607_063129_1033': u'running-closed',
- 'pdmvserv_task_EXO-RunIISpring16DR80-01991__v1_T_160607_065320_4989': u'running-closed',
- 'pdmvserv_task_FSQ-RunIIFall15DR76-00035__v1_T_160529_051059_2431': u'running-closed',
- 'pdmvserv_task_FSQ-RunIIFall15DR76-00036__v1_T_160530_091458_9356': u'running-closed',
- 'pdmvserv_task_HIG-RunIISpring16DR80-01202__v1_T_160615_123725_1983': u'running-closed',
  'pdmvserv_task_HIG-RunIISpring16DR80-01259__v1_T_160620_125903_751': u'running-closed',
- 'pdmvserv_task_HIG-RunIISpring16DR80-01273__v1_T_160621_002508_1213': u'running-closed',
- 'pdmvserv_task_TOP-RunIISpring16DR80-00043__v1_T_160611_010715_7552': u'rejected-archived',
- 'pdmvserv_task_TOP-RunIISpring16DR80-00048__v1_T_160615_122424_1624': u'normal-archived',
- 'pdmvserv_task_TSG-RunIISpring16DR80-00023__v1_T_160614_212137_6781': u'normal-archived',
- 'prozober_ACDC_BPH-RunIISpring16DR80-00002_00185_v0__160531_154059_1635': u'aborted-archived',
- 'prozober_HIG-RunIISummer15wmLHEGS-00230_00059_v0__160615_164923_3825': u'rejected',
- 'vlimant_SUS-RunIISummer15GS-00137_00284_v0__160630_101419_5507': u'running-closed',
+ 'prozober_task_B2G-RunIISpring16DR80-00683__v1_T_160616_114831_7202': u'running-closed',
+ 'vlimant_task_BPH-RunIIFall15DR76-00036__v1_T_160609_150828_2504': u'running-closed',
+ 'vlimant_task_BPH-RunIIFall15DR76-00044__v1_T_160609_151017_3729': u'aborted-archived',
  'vlimant_task_SUS-RunIIFall15DR76-00109__v1_T_160609_150914_3262': u'running-closed',
- 'vlimant_task_SUS-RunIIFall15DR76-00120__v1_T_160609_143246_6395': u'running-closed',
- 'vlimant_task_SUS-RunIIFall15DR76-00121__v1_T_160609_143356_4343': u'running-closed',
- 'vlimant_task_SUS-RunIIFall15DR76-00122__v1_T_160609_143434_4853': u'running-closed'}
+ 'vlimant_task_SUS-RunIIFall15DR76-00120__v1_T_160609_143246_6395': u'running-closed'}
 
 
 def getStatus(workflow):
@@ -114,7 +78,6 @@ def main():
     if 'manage' not in os.environ:
         os.environ['manage'] = '/data/srv/wmagent/current/config/wmagent/manage'
 
-    getStatus("fabozzi_HIRun2015-HIMinimumBias5-02May2016_758p4_160502_172625_4322")
     timenow = int(time.time())
     time6d = timenow - 6 * 24 * 3600
 
@@ -127,6 +90,7 @@ def main():
     wmbsJobsPerWf = formatter.formatDict(myThread.dbi.processData(getJobsExecuting, binds))
     totalJobs = sum([int(item['count']) for item in wmbsJobsPerWf])
     print "Found %d workflows with a total of %d jobs" % (len(wmbsJobsPerWf), totalJobs)
+    #pprint(wmbsJobsPerWf)
 
     # Retrieve all jobs from condor schedd
     schedd = condor.Schedd()
