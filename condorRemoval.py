@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 """
-Removes jobs that are pending in condor for more than 4 days.
+Removes jobs that are in the same condor status for more than 4 days.
 """
 import sys
 import os
 import time
+import json
 import classad
 import htcondor as condor
 from pprint import pprint
@@ -17,21 +18,25 @@ def main():
 
     threshold = 4 * 24 * 3600  # 4 days
     listJobsToRemove = []
+    jobsRemovedInfo = []
     for job in jobs:
-        if job['JobStatus'] == 1:
-            timeThisStatus = job['ServerTime'] - job['EnteredCurrentStatus']
-            if timeThisStatus > threshold:
-                listJobsToRemove.append(job['WMAgent_JobID'])
+        timeThisStatus = job['ServerTime'] - job['EnteredCurrentStatus']
+        if timeThisStatus > threshold:
+            listJobsToRemove.append(job['WMAgent_JobID'])
+            jobsRemovedInfo.append(job)
 
-    print "List of WMBS IDs to remove from condor: %s" % len(listJobsToRemove)
-    sys.exit(1)
+    if jobsRemovedInfo:
+        with open('jobs_removed_script.txt', 'w') as f:
+            for line in jobsRemovedInfo:
+                f.writelines(str(line))
+
+    print "Number of jobs to be removed from condor: %s" % len(listJobsToRemove)
 
     ad = classad.ClassAd()
     ad['foo'] = listJobsToRemove
     jobsConstraint = "member(WMAgent_JobID, %s)" % ad.lookup("foo").__repr__()
     out = schedd.act(condor.JobAction.Remove, jobsConstraint)
-
-    print "Done!"
+    print "Outcome: %s" % out
     sys.exit(0)
 
 
