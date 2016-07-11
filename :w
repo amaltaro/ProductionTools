@@ -118,7 +118,7 @@ def main():
         jobIds  = formatter.formatDict(myThread.dbi.processData(getWMBSIds, binds))
         wmbsIds = [x['id'] for x in jobIds]
         print "%-100s in %s. Has %d wmbs and %d condor jobs" % (item['name'], item['status'], len(wmbsIds), len(item['condorjobs']))
-        # continue
+        #continue
         # Just skip it if there are condor jobs out there
         if len(item['condorjobs']) > 0 or item['status'] == 'UNKNOWN':
             continue
