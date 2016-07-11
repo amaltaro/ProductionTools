@@ -66,10 +66,14 @@ def getStatus(workflow):
     conn = httplib.HTTPSConnection(url, cert_file = os.getenv('X509_USER_PROXY'), key_file = os.getenv('X509_USER_PROXY'))
     urn = "/reqmgr2/data/request/%s" % workflow
     print "Calling urn %s" % urn
-    r1=conn.request("GET", urn, headers=headers)
+    conn.request("GET", urn, headers=headers)
     r2=conn.getresponse()
-    request = json.loads(r2.read())["result"][0]
-    return request[workflow]['RequestStatus']
+    try:
+        request = json.loads(r2.read())["result"][0]
+        status = request[workflow]['RequestStatus']
+    except (KeyError, ValueError):
+        status = 'UNKNOWN'
+    return status
 
 
 def main():
@@ -116,7 +120,7 @@ def main():
         wmbsIds = [x['id'] for x in jobIds]
         print "%-100s in %s. Has %d wmbs and %d condor jobs" % (item['name'], item['status'], len(wmbsIds), len(item['condorjobs']))
         # Just skip it if there are condor jobs out there
-        if len(item['condorjobs']) > 0:
+        if len(item['condorjobs']) > 0 or item['status'] == 'UNKNOWN':
             continue
         newstatus = 'jobfailed' if item['status'] in ('acquired', 'running-open', 'running-closed') else 'cleanout'
         var = raw_input("Marking jobs from %s to %s: (Y/N) " % (item['status'], newstatus))
