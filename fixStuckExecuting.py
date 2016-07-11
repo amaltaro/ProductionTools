@@ -93,8 +93,10 @@ def main():
     #pprint(wmbsJobsPerWf)
 
     # Retrieve all jobs from condor schedd
+    # it returns an iterator, so let's make it a list such that we can iterate over
+    # it several times... why did I notice it only know?!?!
     schedd = condor.Schedd()
-    jobs = schedd.xquery('true', ['ClusterID', 'ProcId', 'WMAgent_RequestName', 'JobStatus', 'WMAgent_JobID'])
+    jobs = list(schedd.xquery('true', ['ClusterID', 'ProcId', 'WMAgent_RequestName', 'JobStatus', 'WMAgent_JobID']))
 
     # Retrieve their status from reqmgr2 and
     # add their wmbsId to the dict
