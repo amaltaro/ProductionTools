@@ -1,9 +1,12 @@
 """
-__getGQByWorkflow.py__
+__getWQStatusByWorkflow.py__
 
-Create a summary of the global workqueue docs by element status and agent handling work.
+Given a workflow name, it collects the status of the workqueue elements status in:
+ a) global workqueue
+ b) local workqueue
+ c) local workqueue_inbox
 
-Created on July 15, 2016.
+Created on September 23, 2016.
 @author: amaltaro
 """
 
@@ -15,11 +18,11 @@ from WMCore.Configuration import loadConfigurationFile
 from WMCore.WorkQueue.WorkQueueBackend import WorkQueueBackend
 
 
-def createElementsSummary(reqName, elements, dbName):
+def createElementsSummary(reqName, elements, queueUrl):
     """
     Print the local couchdb situation based on the WQE status
     """
-    print("Summary for request %s in the '%s' database" % (reqName, dbName))
+    print("\nSummary for %s and request %s" % (queueUrl, reqName))
     summary = {'numberOfElements': len(elements)}
     for elem in elements:
         summary.setdefault(elem['Status'], {})
@@ -44,8 +47,16 @@ def main():
     reqName = sys.argv[1]
 
     globalWQBackend = WorkQueueBackend(config.WorkloadSummary.couchurl, db_name="workqueue")
+    localWQBackend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue")
+    localWQInbox = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue_inbox")
+
     gqDocIDs = globalWQBackend.getElements(RequestName=reqName)
-    createElementsSummary(reqName, gqDocIDs, 'workqueue')
+    localDocIDs = localWQBackend.getElements(RequestName=reqName)
+    localInboxDocIDs = localWQInbox.getElements(RequestName=reqName)
+
+    createElementsSummary(reqName, gqDocIDs, globalWQBackend.queueUrl)
+    createElementsSummary(reqName, localDocIDs, localWQBackend.queueUrl)
+    createElementsSummary(reqName, localInboxDocIDs, localWQInbox.queueUrl)
     
     sys.exit(0)
 
