@@ -13,7 +13,7 @@ import sys
 import os
 import threading
 import logging
-from pprint import pprint
+from pprint import pprint, pformat
 try:
     import htcondor as condor
     from Utils.IterTools import flattenList
@@ -77,21 +77,26 @@ filesNotInPhedexNull = """
     """
 
 
+def printWfStatus(wfs, workflowsDict):
+    """
+    Given a list of request names, print their RequestStatus from the short dictionary.
+    """
+    for wf in wfs:
+        print("%-125s\t%s" % (wf, workflowsDict[wf]['RequestStatus']))
+
+    return
+
+
 def lfn2dset(lfns):
     """ Convert a LFN into a dataset name """
     if isinstance(lfns, basestring):
         lfns = [lfns]
 
     listDsets = set()
-    for lfn in set(lfns):
+    for lfn in lfns:
         toks = lfn.split('/')[3:]
-        toks.pop(5)
-        toks.pop(4)
-
-        toks.insert(1, toks.pop(0))
-        toks[1] += '-' + toks.pop(3)
-        toks.insert(0, '')
-        listDsets.add("/".join(toks))
+        dset = "/%s/%s-%s/%s" % (toks[1], toks[0], toks[3], toks[2])
+        listDsets.add(dset)
 
     return listDsets
 
@@ -114,9 +119,40 @@ def filterKeys(schema):
     return newSchema
 
 
-def getWorkflowStatus(config, listOfWfs):
+def getDsetAndWf(lfns, wfsDict):
     """
-    Given a list of workflows, return their name and RequestStatus
+    Given a list of lfns (files not injected in DBS/TMDB), get their dataset
+    name and compare against the outputdatasets of workflows known by this agent.
+
+    If there is no match, then the workflow has been archived already and there
+    is nothing to worry about.
+
+    If the workflow is known, then we may need to recover these files.
+    """
+    if not lfns:
+        return
+    uniqLfns = set([lfn.rsplit('/', 2)[0] for lfn in lfns])
+    uniqDsets = lfn2dset(uniqLfns)
+    print("==> Which map to %d unique datasets:\n%s" % (len(uniqLfns), pformat(uniqDsets)))
+
+    match = []
+    for dset in uniqDsets:
+        for wf, values in wfsDict.iteritems():
+            if dset in values['OutputDatasets']:
+                match.append((wf, values['RequestStatus'], dset))
+    if match:
+        print("... that were produced by the following workflow, status and the dataset itself:\n")
+        pprint(match)
+    else:
+        print("... that were NOT produced by any agent-known workflow or wfs that are gone from the system.\n")
+
+    return
+
+
+def fetchWorkflowsSpec(config, listOfWfs):
+    """
+    Fetch the workload of a list of workflows. Filter out only a few
+    usefull keys
     """
     if isinstance(listOfWfs, basestring):
         listOfWfs = [listOfWfs]
@@ -125,10 +161,12 @@ def getWorkflowStatus(config, listOfWfs):
                                  couchapp=config.AnalyticsDataCollector.RequestCouchApp)
     tempWfs = wfDBReader.getRequestByNames(listOfWfs, True)
 
+    wfShortDict = {}
     for wf in listOfWfs:
-        print("%-125s\t%s" % (wf, tempWfs[wf]['RequestStatus']))
+        wfShortDict[wf] = filterKeys(tempWfs[wf])
 
-    return
+    return wfShortDict
+
 
 def getCondorJobs():
     """
@@ -160,22 +198,23 @@ def getWMBSInfo(config):
 
     workflows = formatter.formatDict(myThread.dbi.processData(knownWorkflows))
     workflows = [wf['name'] for wf in workflows]
-    print("\n*** Distinct workflows known by this agent:")
-    getWorkflowStatus(config, workflows)
+    print("\n*** Found %d distinct workflows in this agent.\n" % len(workflows))
+    workflowsDict = fetchWorkflowsSpec(config, workflows)
+    printWfStatus(workflows, workflowsDict)
 
     wfsNotInjected = formatter.format(myThread.dbi.processData(workflowsNotInjected))
     wfsNotInjected = [wf['name'] for wf in wfsNotInjected]
-    print("\n*** Workflows not fully injected:\n")
-    getWorkflowStatus(config, wfsNotInjected)
+    print("\n*** Found %d workflows not fully injected.\n" % len(wfsNotInjected))
+    printWfStatus(wfsNotInjected, workflowsDict)
 
     unfinishedSubs = formatter.formatDict(myThread.dbi.processData(unfinishedSubscriptions))
     print("\n*** Subscriptions not finished:\n%s" % unfinishedSubs)
 
     filesAvailable = formatter.formatDict(myThread.dbi.processData(filesAvailWMBS))
-    print("\n*** Files still available in WMBS (waiting for job creation):\n%s" % filesAvailable)
+    print("\n*** Found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable), filesAvailable))
 
     filesAcquired = formatter.formatDict(myThread.dbi.processData(filesAcqWMBS))
-    print("\n*** Files acquired in WMBS (waiting for jobs to finish):\n%s" % filesAcquired)
+    print("\n*** Found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired), filesAcquired))
 
     blocksopenDBS = formatter.formatDict(myThread.dbi.processData(blocksOpenDBS))
     print("\n*** Found %d blocks open in DBS." % len(blocksopenDBS), end="")
@@ -186,12 +225,12 @@ def getWMBSInfo(config):
     print(" Printing the first 20 lfns only:\n%s" % filesnotinDBS[:20])
 
     filesnotinPhedex = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedex)))
-    print("\n*** Found %d files not injected in PhEDEx, with valid block id (recoverable)." % len(filesnotinPhedex), end="")
-    print(" Printing the first 20 lfns only:\n%s" % filesnotinPhedex[:20])
+    print("\n*** Found %d files not injected in PhEDEx, with valid block id (recoverable)." % len(filesnotinPhedex))
+    getDsetAndWf(filesnotinPhedex, workflowsDict)
 
     filesnotinPhedexNull = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedexNull)))
-    print("\n*** Found %d files not injected in PhEDEx, with valid block id (unrecoverable)." % len(filesnotinPhedexNull), end="")
-    print(" Printing the first 20 lfns only:\n%s\n" % filesnotinPhedexNull[:20])
+    print("\n*** Found %d files not injected in PhEDEx, with valid block id (unrecoverable)." % len(filesnotinPhedexNull))
+    getDsetAndWf(filesnotinPhedexNull, workflowsDict)
 
 
 def main():
