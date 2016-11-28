@@ -14,6 +14,7 @@ import os
 import threading
 import logging
 from pprint import pprint, pformat
+
 try:
     import htcondor as condor
     from Utils.IterTools import flattenList
@@ -21,12 +22,11 @@ try:
     from WMCore.Database.DBFormatter import DBFormatter
     from WMCore.Configuration import loadConfigurationFile
     from WMCore.Services.RequestDB.RequestDBReader import RequestDBReader
-    #from WMCore.DAOFactory import DAOFactory
+    # from WMCore.DAOFactory import DAOFactory
 except ImportError:
     print("You do not have a proper environment, please source the following:")
     print("source /data/srv/wmagent/current/apps/wmagent/etc/profile.d/init.sh")
     sys.exit(1)
-
 
 jobCountByState = """
     select wmbs_job_state.name, count(*) AS count
@@ -194,42 +194,44 @@ def getWMBSInfo(config):
     formatter = DBFormatter(logging, myThread.dbi)
 
     jobsByState = formatter.formatDict(myThread.dbi.processData(jobCountByState))
-    print("\n*** Amount of wmbs jobs in each status:\n%s" % jobsByState)
+    print("\n*** WMBS: amount of wmbs jobs in each status:\n%s" % jobsByState)
 
     workflows = formatter.formatDict(myThread.dbi.processData(knownWorkflows))
     workflows = [wf['name'] for wf in workflows]
-    print("\n*** Found %d distinct workflows in this agent.\n" % len(workflows))
+    print("\n*** WORKFLOWS: found %d distinct workflows in this agent." % len(workflows))
     workflowsDict = fetchWorkflowsSpec(config, workflows)
     printWfStatus(workflows, workflowsDict)
 
     wfsNotInjected = formatter.format(myThread.dbi.processData(workflowsNotInjected))
     wfsNotInjected = [wf['name'] for wf in wfsNotInjected]
-    print("\n*** Found %d workflows not fully injected.\n" % len(wfsNotInjected))
+    print("\n*** WORKFLOWS: found %d workflows not fully injected.\n" % len(wfsNotInjected))
     printWfStatus(wfsNotInjected, workflowsDict)
 
     unfinishedSubs = formatter.formatDict(myThread.dbi.processData(unfinishedSubscriptions))
-    print("\n*** Subscriptions not finished:\n%s" % unfinishedSubs)
+    print("\n*** SUBSCRIPTIONS: subscriptions not finished:\n%s" % unfinishedSubs)
 
     filesAvailable = formatter.formatDict(myThread.dbi.processData(filesAvailWMBS))
-    print("\n*** Found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable), filesAvailable))
+    print("\n*** SUBSCRIPTIONS: found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable),
+                                                                                                     filesAvailable))
 
     filesAcquired = formatter.formatDict(myThread.dbi.processData(filesAcqWMBS))
-    print("\n*** Found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired), filesAcquired))
+    print("\n*** SUBSCRIPTIONS: found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired),
+                                                                                                      filesAcquired))
 
     blocksopenDBS = formatter.formatDict(myThread.dbi.processData(blocksOpenDBS))
-    print("\n*** Found %d blocks open in DBS." % len(blocksopenDBS), end="")
+    print("\n*** DBS: found %d blocks open in DBS." % len(blocksopenDBS), end="")
     print(" Printing the first 20 blocks only:\n%s" % blocksopenDBS[:20])
 
     filesnotinDBS = formatter.formatDict(myThread.dbi.processData(filesNotInDBS))
-    print("\n*** Found %d files not uploaded to DBS." % len(filesnotinDBS), end="")
+    print("\n*** DBS: found %d files not uploaded to DBS." % len(filesnotinDBS), end="")
     print(" Printing the first 20 lfns only:\n%s" % filesnotinDBS[:20])
 
     filesnotinPhedex = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedex)))
-    print("\n*** Found %d files not injected in PhEDEx, with valid block id (recoverable)." % len(filesnotinPhedex))
+    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (recoverable)." % len(filesnotinPhedex))
     getDsetAndWf(filesnotinPhedex, workflowsDict)
 
     filesnotinPhedexNull = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedexNull)))
-    print("\n*** Found %d files not injected in PhEDEx, with valid block id (unrecoverable)." % len(filesnotinPhedexNull))
+    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (unrecoverable)." % len(filesnotinPhedexNull))
     getDsetAndWf(filesnotinPhedexNull, workflowsDict)
 
 
@@ -256,8 +258,18 @@ def main():
 
     getWMBSInfo(config)
 
+    print("\nI'm done!")
     sys.exit(0)
 
 
 if __name__ == '__main__':
     sys.exit(main())
+
+###################### Alan notes ########################
+"""
+1. Failing subscription files available for workflows that we no longer care:
+INSERT INTO wmbs_sub_files_failed (fileid, subscription)
+  SELECT fileid, subscription from wmbs_sub_files_available WHERE subscription = 20337;
+
+DELETE FROM wmbs_sub_files_available WHERE subscription = 20337;
+"""
