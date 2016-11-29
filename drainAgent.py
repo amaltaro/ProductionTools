@@ -11,6 +11,7 @@ from __future__ import print_function
 
 import sys
 import os
+import argparse
 import threading
 import logging
 from pprint import pprint, pformat
@@ -144,7 +145,7 @@ def getDsetAndWf(lfns, wfsDict):
         print("... that were produced by the following workflow, status and the dataset itself:\n")
         pprint(match)
     else:
-        print("... that were NOT produced by any agent-known workflow or wfs that are gone from the system.\n")
+        print("... that were NOT produced by any agent-known workflow. OR, the wfs are gone already.\n")
 
     return
 
@@ -212,11 +213,11 @@ def getWMBSInfo(config):
 
     filesAvailable = formatter.formatDict(myThread.dbi.processData(filesAvailWMBS))
     print("\n*** SUBSCRIPTIONS: found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable),
-                                                                                                     filesAvailable))
+                                                                                                         filesAvailable))
 
     filesAcquired = formatter.formatDict(myThread.dbi.processData(filesAcqWMBS))
     print("\n*** SUBSCRIPTIONS: found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired),
-                                                                                                      filesAcquired))
+                                                                                                          filesAcquired))
 
     blocksopenDBS = formatter.formatDict(myThread.dbi.processData(blocksOpenDBS))
     print("\n*** DBS: found %d blocks open in DBS." % len(blocksopenDBS), end="")
@@ -227,12 +228,24 @@ def getWMBSInfo(config):
     print(" Printing the first 20 lfns only:\n%s" % filesnotinDBS[:20])
 
     filesnotinPhedex = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedex)))
-    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (recoverable)." % len(filesnotinPhedex))
+    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (recoverable).\n" % len(filesnotinPhedex))
     getDsetAndWf(filesnotinPhedex, workflowsDict)
 
     filesnotinPhedexNull = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedexNull)))
-    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (unrecoverable)." % len(filesnotinPhedexNull))
+    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (unrecoverable).\n" % len(filesnotinPhedexNull))
     getDsetAndWf(filesnotinPhedexNull, workflowsDict)
+
+
+def parseArgs():
+    """
+    Well, parse the arguments passed in the command line :)
+    """
+    parser = argparse.ArgumentParser(description="Does a bunch of draining checks")
+    parser.add_argument('-t', '--twiki', action='store_true', default=False,
+                        help='Use it to get an output that can be directly pasted in a twiki')
+    args = parser.parse_args()
+    return args
+
 
 
 def main():
@@ -250,14 +263,21 @@ def main():
       10. list of files not injected into phedex, with parent block
       11. list of files not injected into phedex, without parent block
     """
+    args = parseArgs()
+
+
+    twiki = ('<pre>', '</pre>') if args.twiki else ('', '')
+    print(twiki[0])
+
     os.environ['WMAGENT_CONFIG'] = '/data/srv/wmagent/current/config/wmagent/config.py'
     config = loadConfigurationFile(os.environ["WMAGENT_CONFIG"])
 
-    print("\n*** Amount of jobs in condor per workflow, sorted by condor job status:")
+    print("\n*** Amount of jobs in condor per workflow, sorted by condor job status:\n")
     pprint(getCondorJobs())
 
     getWMBSInfo(config)
 
+    print(twiki[1])
     print("\nI'm done!")
     sys.exit(0)
 
