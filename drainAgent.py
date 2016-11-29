@@ -133,7 +133,7 @@ def getDsetAndWf(lfns, wfsDict):
         return
     uniqLfns = set([lfn.rsplit('/', 2)[0] for lfn in lfns])
     uniqDsets = lfn2dset(uniqLfns)
-    print("==> Which map to %d unique datasets:\n%s" % (len(uniqLfns), pformat(uniqDsets)))
+    print("==> Which maps to %d unique datasets:\n%s" % (len(uniqDsets), pformat(uniqDsets)))
 
     match = []
     for dset in uniqDsets:
@@ -198,7 +198,7 @@ def getWMBSInfo(config):
 
     workflows = formatter.formatDict(myThread.dbi.processData(knownWorkflows))
     workflows = [wf['name'] for wf in workflows]
-    print("\n*** WORKFLOWS: found %d distinct workflows in this agent." % len(workflows))
+    print("\n*** WORKFLOWS: found %d distinct workflows in this agent.\n" % len(workflows))
     workflowsDict = fetchWorkflowsSpec(config, workflows)
     printWfStatus(workflows, workflowsDict)
 
