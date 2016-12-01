@@ -54,7 +54,7 @@ filesAcqWMBS = "select subscription,count(*) from wmbs_sub_files_acquired group 
 
 blocksOpenDBS = "SELECT * FROM dbsbuffer_block WHERE status!='Closed'"
 
-filesNotInDBS = "SELECT * from dbsbuffer_file where status = 'NOTUPLOADED'"
+filesNotInDBS = "SELECT lfn from dbsbuffer_file where status = 'NOTUPLOADED'"
 
 filesNotInPhedex = """
     SELECT lfn FROM dbsbuffer_file
@@ -223,9 +223,9 @@ def getWMBSInfo(config):
     print("\n*** DBS: found %d blocks open in DBS." % len(blocksopenDBS), end="")
     print(" Printing the first 20 blocks only:\n%s" % blocksopenDBS[:20])
 
-    filesnotinDBS = formatter.formatDict(myThread.dbi.processData(filesNotInDBS))
-    print("\n*** DBS: found %d files not uploaded to DBS." % len(filesnotinDBS), end="")
-    print(" Printing the first 20 lfns only:\n%s" % filesnotinDBS[:20])
+    filesnotinDBS = flattenList(formatter.format(myThread.dbi.processData(filesNotInDBS)))
+    print("\n*** DBS: found %d files not uploaded to DBS.\n" % len(filesnotinDBS))
+    getDsetAndWf(filesnotinDBS, workflowsDict)
 
     filesnotinPhedex = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedex)))
     print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (recoverable).\n" % len(filesnotinPhedex))
