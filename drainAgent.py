@@ -77,6 +77,17 @@ filesNotInPhedexNull = """
       AND lfn NOT LIKE '/store/user%%'
     """
 
+workflowsExecuting = """
+    SELECT wmbs_workflow.name AS name, count(wmbs_job.id) AS count
+    FROM wmbs_job
+    INNER JOIN wmbs_jobgroup ON wmbs_job.jobgroup = wmbs_jobgroup.id
+    INNER JOIN wmbs_subscription ON wmbs_jobgroup.subscription = wmbs_subscription.id
+    INNER JOIN wmbs_sub_types ON wmbs_subscription.subtype = wmbs_sub_types.id
+    INNER JOIN wmbs_job_state ON wmbs_job.state = wmbs_job_state.id
+    INNER JOIN wmbs_workflow ON wmbs_subscription.workflow = wmbs_workflow.id
+    WHERE wmbs_job_state.name = 'executing' GROUP BY wmbs_workflow.name
+    """
+
 
 def printWfStatus(wfs, workflowsDict):
     """
@@ -194,14 +205,20 @@ def getWMBSInfo(config):
     myThread = threading.currentThread()
     formatter = DBFormatter(logging, myThread.dbi)
 
-    jobsByState = formatter.formatDict(myThread.dbi.processData(jobCountByState))
-    print("\n*** WMBS: amount of wmbs jobs in each status:\n%s" % jobsByState)
-
     workflows = formatter.formatDict(myThread.dbi.processData(knownWorkflows))
     workflows = [wf['name'] for wf in workflows]
     print("\n*** WORKFLOWS: found %d distinct workflows in this agent.\n" % len(workflows))
     workflowsDict = fetchWorkflowsSpec(config, workflows)
     printWfStatus(workflows, workflowsDict)
+
+    jobsByState = formatter.formatDict(myThread.dbi.processData(jobCountByState))
+    print("\n*** WMBS: amount of wmbs jobs in each status:\n%s" % jobsByState)
+    # IF we have executing jobs in wmbs and nothing in condor, then investigate the wfs
+    if 'executing' in [item['name'] for item in jobsByState]:
+        wfsJobCount = formatter.formatDict(myThread.dbi.processData(workflowsExecuting))
+        print("\n*** WMBS: %d workflows with executing jobs in wmbs:" % len(wfsJobCount))
+        workflows = [wf['name'] for wf in wfsJobCount]
+        printWfStatus(workflows, workflowsDict)
 
     wfsNotInjected = formatter.format(myThread.dbi.processData(workflowsNotInjected))
     wfsNotInjected = [wf['name'] for wf in wfsNotInjected]
@@ -292,4 +309,9 @@ INSERT INTO wmbs_sub_files_failed (fileid, subscription)
   SELECT fileid, subscription from wmbs_sub_files_available WHERE subscription = 20337;
 
 DELETE FROM wmbs_sub_files_available WHERE subscription = 20337;
+
+
+2. Aborted workflows that still have executing jobs or subscriptions opened.
+$manage execute-agent kill-workflow-in-agent $wf
+Just force-abort it. Needs to integrate it to this script, eventually...
 """
