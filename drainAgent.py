@@ -36,6 +36,8 @@ jobCountByState = """
       group by wmbs_job.state, wmbs_job_state.name
     """
 
+incompleteWfs = "SELECT DISTINCT name FROM dbsbuffer_workflow WHERE completed = 0"
+
 knownWorkflows = "SELECT DISTINCT name from wmbs_workflow"
 
 workflowsNotInjected = "select distinct name from wmbs_workflow where injected = 0"
@@ -207,9 +209,19 @@ def getWMBSInfo(config):
 
     workflows = formatter.formatDict(myThread.dbi.processData(knownWorkflows))
     workflows = [wf['name'] for wf in workflows]
-    print("\n*** WORKFLOWS: found %d distinct workflows in this agent.\n" % len(workflows))
+    print("\n*** WORKFLOWS: found %d distinct workflows in this agent." % len(workflows))
     workflowsDict = fetchWorkflowsSpec(config, workflows)
     printWfStatus(workflows, workflowsDict)
+
+    workflows = formatter.formatDict(myThread.dbi.processData(incompleteWfs))
+    workflows = [wf['name'] for wf in workflows]
+    print("\n*** WORKFLOWS: there are %d distinct workflows not completed." % len(workflows))
+    printWfStatus(workflows, workflowsDict)
+
+    wfsNotInjected = formatter.format(myThread.dbi.processData(workflowsNotInjected))
+    wfsNotInjected = [wf['name'] for wf in wfsNotInjected]
+    print("\n*** WORKFLOWS: found %d workflows not fully injected." % len(wfsNotInjected))
+    printWfStatus(wfsNotInjected, workflowsDict)
 
     jobsByState = formatter.formatDict(myThread.dbi.processData(jobCountByState))
     print("\n*** WMBS: amount of wmbs jobs in each status:\n%s" % jobsByState)
@@ -219,11 +231,6 @@ def getWMBSInfo(config):
         print("\n*** WMBS: %d workflows with executing jobs in wmbs:" % len(wfsJobCount))
         workflows = [wf['name'] for wf in wfsJobCount]
         printWfStatus(workflows, workflowsDict)
-
-    wfsNotInjected = formatter.format(myThread.dbi.processData(workflowsNotInjected))
-    wfsNotInjected = [wf['name'] for wf in wfsNotInjected]
-    print("\n*** WORKFLOWS: found %d workflows not fully injected.\n" % len(wfsNotInjected))
-    printWfStatus(wfsNotInjected, workflowsDict)
 
     unfinishedSubs = formatter.formatDict(myThread.dbi.processData(unfinishedSubscriptions))
     print("\n*** SUBSCRIPTIONS: subscriptions not finished:\n%s" % unfinishedSubs)
@@ -245,11 +252,11 @@ def getWMBSInfo(config):
     getDsetAndWf(filesnotinDBS, workflowsDict)
 
     filesnotinPhedex = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedex)))
-    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (recoverable).\n" % len(filesnotinPhedex))
+    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (recoverable)." % len(filesnotinPhedex))
     getDsetAndWf(filesnotinPhedex, workflowsDict)
 
     filesnotinPhedexNull = flattenList(formatter.format(myThread.dbi.processData(filesNotInPhedexNull)))
-    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (unrecoverable).\n" % len(filesnotinPhedexNull))
+    print("\n*** PHEDEX: found %d files not injected in PhEDEx, with valid block id (unrecoverable)." % len(filesnotinPhedexNull))
     getDsetAndWf(filesnotinPhedexNull, workflowsDict)
 
 
@@ -289,13 +296,13 @@ def main():
     os.environ['WMAGENT_CONFIG'] = '/data/srv/wmagent/current/config/wmagent/config.py'
     config = loadConfigurationFile(os.environ["WMAGENT_CONFIG"])
 
-    print("\n*** Amount of jobs in condor per workflow, sorted by condor job status:\n")
+    print("*** Amount of jobs in condor per workflow, sorted by condor job status:")
     pprint(getCondorJobs())
 
     getWMBSInfo(config)
 
     print(twiki[1])
-    print("\nI'm done!")
+    print("I'm done!")
     sys.exit(0)
 
 
