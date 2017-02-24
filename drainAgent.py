@@ -19,13 +19,14 @@ from pprint import pprint, pformat
 try:
     import htcondor as condor
     from Utils.IterTools import flattenList
+    #from Utils.IteratorTools import flattenList
     from WMCore.WMInit import connectToDB
     from WMCore.Database.DBFormatter import DBFormatter
     from WMCore.Configuration import loadConfigurationFile
     from WMCore.Services.RequestDB.RequestDBReader import RequestDBReader
     # from WMCore.DAOFactory import DAOFactory
-except ImportError:
-    print("You do not have a proper environment, please source the following:")
+except ImportError as e:
+    print("You do not have a proper environment (%s), please source the following:" % str(e))
     print("source /data/srv/wmagent/current/apps/wmagent/etc/profile.d/init.sh")
     sys.exit(1)
 
@@ -233,15 +234,17 @@ def getWMBSInfo(config):
         printWfStatus(workflows, workflowsDict)
 
     unfinishedSubs = formatter.formatDict(myThread.dbi.processData(unfinishedSubscriptions))
-    print("\n*** SUBSCRIPTIONS: subscriptions not finished:\n%s" % unfinishedSubs)
+    unfinishedSubs = [wf['wfname'] for wf in unfinishedSubs]
+    print("\n*** SUBSCRIPTIONS: subscriptions not finished: %d" % len(unfinishedSubs))
+    printWfStatus(unfinishedSubs, workflowsDict)
 
     filesAvailable = formatter.formatDict(myThread.dbi.processData(filesAvailWMBS))
     print("\n*** SUBSCRIPTIONS: found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable),
-                                                                                                         filesAvailable))
+                                                                                                     filesAvailable))
 
     filesAcquired = formatter.formatDict(myThread.dbi.processData(filesAcqWMBS))
     print("\n*** SUBSCRIPTIONS: found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired),
-                                                                                                          filesAcquired))
+                                                                                                      filesAcquired))
 
     blocksopenDBS = formatter.formatDict(myThread.dbi.processData(blocksOpenDBS))
     print("\n*** DBS: found %d blocks open in DBS." % len(blocksopenDBS), end="")
