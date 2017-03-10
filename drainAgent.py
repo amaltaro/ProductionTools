@@ -15,7 +15,7 @@ import argparse
 import threading
 import logging
 from pprint import pprint, pformat
-
+from time import gmtime, strftime
 try:
     import htcondor as condor
     from Utils.IterTools import flattenList
@@ -29,6 +29,7 @@ except ImportError as e:
     print("You do not have a proper environment (%s), please source the following:" % str(e))
     print("source /data/srv/wmagent/current/apps/wmagent/etc/profile.d/init.sh")
     sys.exit(1)
+
 
 jobCountByState = """
     select wmbs_job_state.name, count(*) AS count
@@ -298,6 +299,9 @@ def main():
 
     os.environ['WMAGENT_CONFIG'] = '/data/srv/wmagent/current/config/wmagent/config.py'
     config = loadConfigurationFile(os.environ["WMAGENT_CONFIG"])
+
+    gmtTimeNow = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
+    print("Drain check time: %s\n" % gmtTimeNow)
 
     print("*** Amount of jobs in condor per workflow, sorted by condor job status:")
     pprint(getCondorJobs())
