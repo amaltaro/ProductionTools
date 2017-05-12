@@ -18,8 +18,7 @@ from pprint import pprint, pformat
 from time import gmtime, strftime
 try:
     import htcondor as condor
-    from Utils.IterTools import flattenList
-    #from Utils.IteratorTools import flattenList
+    from Utils.IteratorTools import flattenList
     from WMCore.WMInit import connectToDB
     from WMCore.Database.DBFormatter import DBFormatter
     from WMCore.Configuration import loadConfigurationFile
