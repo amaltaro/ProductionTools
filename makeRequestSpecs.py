@@ -17,9 +17,24 @@ def getWorkloadFactory(requestType):
     return spec
 
 
-def furtherTweaks(spec):
+def furtherTweaks(spec, reqType=None):
     reqmgrArgs = ('Requestor', 'RequestorDN', 'RequestName', 'RequestStatus', 'RequestTransition',
                   'RequestDate', 'CouchURL', 'CouchDBName', 'CouchWorkloadDBName')
+
+    # snipe in a few floating arguments
+    if reqType == 'TaskChain':
+        spec['Task1'] = {"default": {}, "optional": False, "type": dict}
+    elif reqType == 'StepChain':
+        spec['Step1'] = {"default": {}, "optional": False, "type": dict}
+    elif reqType == 'ReReco':
+        # then update the Skim key names with 1 in the end to avoid confusion
+        for k in spec:
+            newkey = k.replace('#N', '1')
+            val = spec.pop(k)
+            spec[newkey] = val
+            # sigh ... these Skim arguments are not really clear...
+            if newkey.startswith('Skim'):
+                spec[newkey]['optional'] = True
 
     # first remove arguments that are set by ReqMgr2
     specArgs = {k: v for k, v in spec.items() if k not in reqmgrArgs}
@@ -29,6 +44,7 @@ def furtherTweaks(spec):
         defin.pop('attr', None)
         defin.pop('validate', None)
         defin.pop('null', None)
+
     return specArgs
 
 
@@ -45,7 +61,10 @@ def main():
     for req in requestTypes:
         spec = getWorkloadFactory(req)
         reqSpec = spec.getWorkloadCreateArgs()
-        reqSpec = furtherTweaks(reqSpec)
+        # hack ReReco floating args in
+        if req == 'ReReco':
+            reqSpec.update(spec.getSkimArguments())
+        reqSpec = furtherTweaks(reqSpec, req)
 
         reqFile = '%s_createSpec.json' % req
         writeToFile(reqFile, reqSpec)
