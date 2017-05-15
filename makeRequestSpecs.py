@@ -5,6 +5,7 @@ definition
 """
 from __future__ import print_function
 import sys
+import json
 from pprint import pprint
 
 from WMCore.WMFactory import WMFactory
@@ -44,14 +45,13 @@ def furtherTweaks(spec, reqType=None):
         defin.pop('attr', None)
         defin.pop('validate', None)
         defin.pop('null', None)
-
+        defin['type'] = str(defin['type'])
     return specArgs
 
 
 def writeToFile(fileName, data):
-    print("Creating file: %s" % fileName)
     with open(fileName, 'w') as fo:
-        pprint(data, fo, width=160)
+        json.dump(data, fo, indent=4, sort_keys=True)
     return
 
 
