@@ -90,17 +90,16 @@ def main():
         jobReport.load(f)
         jobSucceeded = jobReport.taskSuccessful()
         print("  Successful job: %s" % jobSucceeded)
-        if not jobSucceeded:
-            print("  Job exit codes are: %s" % jobReport.getExitCodes())
-            if verbose:
-                verboseData.append(jobReport.__to_json__(None))
+        print("  Job exit codes are: %s" % jobReport.getExitCodes())
+        if verbose:
+            verboseData.append(jobReport.__to_json__(None))
 
     if verbose:
         print("\nDumping all the FJRs content into verboseReport.json\n")
         with open('verboseReport.json', 'w') as jo:
             json.dump(verboseData, jo, indent=2)
 
-    print("Remove them, restart the component and be happy!")
+    print("\nRemove them, restart the component and be happy!")
     return 0
 
 
