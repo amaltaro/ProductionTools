@@ -15,7 +15,6 @@ import json
 import os
 import sys
 from collections import defaultdict
-from copy import copy
 from time import strptime
 
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
@@ -45,18 +44,28 @@ def main():
 
     for status, wfList in wfByStatus.iteritems():
         print("\nRetrieving agent info for %d requests in status %s" % (len(wfList), status))
-        res = getAgentName(wfList)
-    # pprint(dict(wfByStatus))
-    # work = retrieveWorkload(sys.argv[1])
-    # workflow = submitWorkflow(newDict)
+        if status in ("new", "assignment-approved", "assigned", "acquired"):
+            printNonAgent(wfList)  # hasn't been pulled yet
+        else:
+            res = getAgentName(wfList)
+
     sys.exit(0)
+
+
+def printNonAgent(requests):
+    for req in requests:
+        print("    %-150s : []" % req)
+    return
 
 
 def retrieveByDate(month):
     """Given a month name, fetch all workflows and their status from couchdb"""
     monthNum = strptime(month, "%b").tm_mon
     startdate = [2017, monthNum, 1]
-    enddate = [2017, monthNum, 31]
+    if month == 'Sep':
+        enddate = [2017, monthNum, 12]
+    else:
+        enddate = [2017, monthNum, 31]
 
     headers = {"Content-type": "application/json",
                "Accept": "application/json"}
@@ -101,73 +110,6 @@ def updateSpec(requestName):
     """
     reqUrl = "https://cmsweb.cern.ch/couchdb/reqmgr_workload_cache"
     HELPER.loadSpecFromCouch(reqUrl, requestName)
-
-
-def retrieveWorkload(workflowName):
-    headers = {"Content-type": "application/json",
-               "Accept": "application/json"}
-    conn = httplib.HTTPSConnection(url, cert_file=os.getenv('X509_USER_PROXY'), key_file=os.getenv('X509_USER_PROXY'))
-    urn = "/reqmgr2/data/request/%s" % workflowName
-    conn.request("GET", urn, headers=headers)
-    r2 = conn.getresponse()
-    request = json.loads(r2.read())["result"][0][workflowName]
-    return request
-
-
-def buildRequest(req_cache):
-    newSchema = copy(DEFAULT_DICT)
-    # first update top level dict
-    for k, v in DEFAULT_DICT.iteritems():
-        if v != "UPDATEME":
-            continue
-        if k == 'RequestString':
-            newSchema[k] = req_cache[k] + '_Converted'
-        elif k == "PrepID":
-            newSchema[k] = 'TEST-' + req_cache[k]
-        elif k == "StepChain":
-            newSchema[k] = req_cache["TaskChain"]
-        elif k in req_cache:
-            newSchema[k] = req_cache[k]
-
-    # then build the steps
-    timePerEvent = 0
-    sizePerEvent = 0
-    memory = []
-    for i in range(1, newSchema['StepChain'] + 1):
-        newSchema['Step%s' % i] = req_cache['Task%s' % i]
-        newSchema['Step%s' % i]['StepName'] = newSchema['Step%s' % i].pop('TaskName')
-        if 'InputTask' in newSchema['Step%s' % i]:
-            newSchema['Step%s' % i]['InputStep'] = newSchema['Step%s' % i].pop('InputTask')
-
-        timePerEvent += newSchema['Step%s' % i].pop('TimePerEvent', 0)
-        sizePerEvent += newSchema['Step%s' % i].pop('SizePerEvent', 0)
-        memory.append(newSchema['Step%s' % i].get('Memory', 0))
-    # finally, override global value by sum of steps
-    if timePerEvent > 0:
-        newSchema['TimePerEvent'] = timePerEvent
-    if sizePerEvent > 0:
-        newSchema['SizePerEvent'] = sizePerEvent
-    memory.append(newSchema.get('Memory', 0))
-    newSchema['Memory'] = max(memory)
-    return newSchema
-
-
-def submitWorkflow(schema):
-    headers = {"Content-type": "application/json",
-               "Accept": "application/json"}
-    encodedParams = json.dumps(schema)
-    conn = httplib.HTTPSConnection(url, cert_file=os.getenv('X509_USER_PROXY'), key_file=os.getenv('X509_USER_PROXY'))
-    conn.request("POST", "/reqmgr2/data/request", encodedParams, headers)
-    resp = conn.getresponse()
-    data = resp.read()
-    if resp.status != 200:
-        print("Response status: %s\tResponse reason: %s" % (resp.status, resp.reason))
-        print("Error message: %s" % resp.msg.getheader('X-Error-Detail'))
-        sys.exit(1)
-    data = json.loads(data)
-    requestName = data['result'][0]['request']
-    print("  Request '%s' successfully created." % requestName)
-    return requestName
 
 
 if __name__ == '__main__':
