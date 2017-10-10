@@ -6,7 +6,10 @@ don't get created.
 It queries several services:
  1. given a date range (actually a month), it retrieved all workflows created in that range
  2. if the workflow is active, then it tries to find the agents that were working on that request
- 3. TODO: if the workflow is affected, fetch its spec file from ReqMgr and update it
+in the end it prints a summary of the amount and request names that might be affected.
+
+One still has to do a last check and feed that list of workflows into updateSpec.py, such that
+the spec files get properly updated and can then be processed by the new agent.
 """
 from __future__ import print_function
 
@@ -17,11 +20,7 @@ import sys
 from collections import defaultdict
 from time import strptime
 
-from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
-
 url = "cmsweb.cern.ch"
-reqmgrCouchURL = "https://" + url + "/couchdb/reqmgr_workload_cache"
-HELPER = WMWorkloadHelper()
 
 
 def main():
@@ -54,7 +53,7 @@ def main():
 
 def printNonAgent(requests):
     for req in requests:
-        print("    %-150s : []" % req)
+        print("    %-105s : []" % req)
     return
 
 
@@ -63,15 +62,15 @@ def retrieveByDate(month):
     monthNum = strptime(month, "%b").tm_mon
     startdate = [2017, monthNum, 1]
     if month == 'Sep':
-        enddate = [2017, monthNum, 12]
+        enddate = [2017, monthNum, 13]
     else:
-        enddate = [2017, monthNum, 31]
+        enddate = [2017, monthNum + 1, 1]
 
     headers = {"Content-type": "application/json",
                "Accept": "application/json"}
     conn = httplib.HTTPSConnection(url, cert_file=os.getenv('X509_USER_PROXY'), key_file=os.getenv('X509_USER_PROXY'))
     urn = "/couchdb/reqmgr_workload_cache/_design/ReqMgr/_view/bydate?descending=false&startkey=%s&endkey=%s" % (
-    startdate, enddate)
+        startdate, enddate)
     urn = urn.replace(" ", "")  # replace spaces for couch queries
     print("Querying couchdb for: %s" % urn)
     conn.request("GET", urn, headers=headers)
@@ -96,20 +95,10 @@ def getAgentName(requestList):
         r2 = conn.getresponse()
         reqDict = json.loads(r2.read())["result"][0][req]
         agentList = reqDict.get("AgentJobInfo", {}).keys()
-        print("    %-150s : %s" % (req, agentList))
+        print("    %-105s : %s" % (req, agentList))
         results[req] = agentList
 
     return results
-
-
-def updateSpec(requestName):
-    """
-    Given a request name, fetch its spec file from cmsweb couch and
-    parse every single task and add one attribute to the input reference
-    section
-    """
-    reqUrl = "https://cmsweb.cern.ch/couchdb/reqmgr_workload_cache"
-    HELPER.loadSpecFromCouch(reqUrl, requestName)
 
 
 if __name__ == '__main__':
