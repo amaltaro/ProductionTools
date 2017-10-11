@@ -8,7 +8,7 @@ the new spec file again in couchdb.
 from __future__ import print_function
 
 import sys
-
+from pprint import pformat
 from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 
 HELPER = WMWorkloadHelper()
@@ -36,34 +36,64 @@ def updateSpec(requestName):
     parse every single task and add one attribute to the input reference
     section
     """
-    reqUrl = "https://cmsweb-testbed.cern.ch/couchdb/reqmgr_workload_cache"
-    HELPER.loadSpecFromCouch(reqUrl, requestName)
-    if HELPER.getRequestType() == "StepChain":
-        print("Skipping spec changes for StepChain %s" % requestName)
-        return
-
     saveChanges = False
-    print("Changing spec for %s" % requestName)
-    for task in HELPER.taskIterator():
-        print("    Top level task: %s" % task.name())
-        for tt in task.taskIterator():
-            print("    Iterating over task: %s" % tt.name())
-            if tt.taskType() in ["Production", "Processing", "Skim"]:
+    reqUrl = "https://cmsweb.cern.ch/couchdb/reqmgr_workload_cache"
+    HELPER.loadSpecFromCouch(reqUrl, requestName)
+    print("SPEC: %s" % requestName)
+    if HELPER.getRequestType() == "StepChain":
+        print("SKIP spec changes for StepChain %s" % requestName)
+        return
+    elif HELPER.getRequestType() == "Resubmission" and HELPER.getTopLevelTask().taskType() == "Merge":
+        tt = HELPER.getTopLevelTask()
+        print("    Top level Merge task: %s" % tt.name())
+        if hasattr(tt.data.input, "outputModule"):
+            inputOutMod = tt.data.input.outputModule
+            if not hasattr(tt.data.input, "dataTier"):
+                # be safe, load the Merged outputModule instead of relying on the parent
                 res = tt.getOutputModulesForTask(cmsRunOnly=True)
                 if len(res) > 1:
                     print("    ERROR: there should not exist > 1 output module!!!")
                     return
-                parentOutMod = res[0].dictionary_()
-                print("    Parent out mods: %s" % parentOutMod.keys())
-            elif tt.taskType() in ["Merge", "Cleanup"]:
-                if hasattr(tt.data.input, "outputModule"):
-                    inputOutMod = tt.data.input.outputModule
-                    inputOutTier = parentOutMod[inputOutMod].dataTier
-                    print("        input.outputModule: %s with tier: %s" % (inputOutMod, inputOutTier))
-                    if not hasattr(tt.data.input, "dataTier") and inputOutTier:
-                        # then set this attribute
-                        setattr(tt.data.input, "dataTier", inputOutTier)
-                        saveChanges = True
+                inputOutTier = res[0].Merged.dataTier
+                print("        updating input.outputModule: %s with input.dataTier: %s" % (inputOutMod, inputOutTier))
+                setattr(tt.data.input, "dataTier", inputOutTier)
+                saveChanges = True
+
+    for task in HELPER.getAllTasks():
+        if task.taskType() in ["Production", "Processing", "Skim"]:
+            print("    Parent task: %s" % task.name())
+            res = task.getOutputModulesForTask(cmsRunOnly=True)
+            if len(res) > 1:
+                print("    ERROR: there should not exist > 1 output module!!!")
+                return
+            parentOutMod = res[0].dictionary_()
+            print("    Parent out mods: %s" % parentOutMod.keys())
+
+            for tt in task.childTaskIterator():
+                if tt.taskType() == "Merge":
+                    print("    Child Merge task: %s" % tt.name())
+                    if hasattr(tt.data.input, "outputModule"):
+                        inputOutMod = tt.data.input.outputModule
+                        if not hasattr(tt.data.input, "dataTier"):
+                            # be safe, load the Merged outputModule instead of relying on the parent
+                            res = tt.getOutputModulesForTask(cmsRunOnly=True)
+                            if len(res) > 1:
+                                print("    ERROR: there should not exist > 1 output module!!!")
+                                return
+                            inputOutTier = res[0].Merged.dataTier
+                            print("        updating input.outputModule: %s with input.dataTier: %s" % (inputOutMod, inputOutTier))
+                            setattr(tt.data.input, "dataTier", inputOutTier)
+                            saveChanges = True
+                elif tt.taskType() == "Cleanup":
+                    print("    Child Cleanup task: %s" % tt.name())
+                    if hasattr(tt.data.input, "outputModule"):
+                        inputOutMod = tt.data.input.outputModule
+                        inputOutTier = parentOutMod[inputOutMod].dataTier
+                        if not hasattr(tt.data.input, "dataTier") and inputOutTier:
+                            # then set this attribute based on the parent settings
+                            print("        updating input.outputModule: %s with input.dataTier: %s" % (inputOutMod, inputOutTier))
+                            setattr(tt.data.input, "dataTier", inputOutTier)
+                            saveChanges = True
 
     if saveChanges:
         print("    Saving changed spec file for: %s\n" % requestName)
