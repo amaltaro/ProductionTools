@@ -40,24 +40,31 @@ def updateSpec(requestName):
     reqUrl = "https://cmsweb.cern.ch/couchdb/reqmgr_workload_cache"
     HELPER.loadSpecFromCouch(reqUrl, requestName)
     print("SPEC: %s" % requestName)
+
     if HELPER.getRequestType() == "StepChain":
         print("SKIP spec changes for StepChain %s" % requestName)
         return
-    elif HELPER.getRequestType() == "Resubmission" and HELPER.getTopLevelTask().taskType() == "Merge":
-        tt = HELPER.getTopLevelTask()
-        print("    Top level Merge task: %s" % tt.name())
-        if hasattr(tt.data.input, "outputModule"):
-            inputOutMod = tt.data.input.outputModule
-            if not hasattr(tt.data.input, "dataTier"):
-                # be safe, load the Merged outputModule instead of relying on the parent
-                res = tt.getOutputModulesForTask(cmsRunOnly=True)
-                if len(res) > 1:
-                    print("    ERROR: there should not exist > 1 output module!!!")
-                    return
-                inputOutTier = res[0].Merged.dataTier
-                print("        updating input.outputModule: %s with input.dataTier: %s" % (inputOutMod, inputOutTier))
-                setattr(tt.data.input, "dataTier", inputOutTier)
-                saveChanges = True
+    # elif HELPER.getRequestType() == "Resubmission":  # see issue 8239
+    elif HELPER.data.request.schema.RequestType == "Resubmission":
+        if len(HELPER.getTopLevelTask()) > 1:
+            print("ERROR: How come it has more than one top level task... abort abort!")
+            return
+
+        tt = HELPER.getTopLevelTask()[0]
+        if tt.taskType() == "Merge":
+            print("    Top level Merge task: %s" % tt.name())
+            if hasattr(tt.data.input, "outputModule"):
+                inputOutMod = tt.data.input.outputModule
+                if not hasattr(tt.data.input, "dataTier"):
+                    # be safe, load the Merged outputModule instead of relying on the parent
+                    res = tt.getOutputModulesForTask(cmsRunOnly=True)
+                    if len(res) > 1:
+                        print("    ERROR: there should not exist > 1 output module!!!")
+                        return
+                    inputOutTier = res[0].Merged.dataTier
+                    print("        updating input.outputModule: %s with input.dataTier: %s" % (inputOutMod, inputOutTier))
+                    setattr(tt.data.input, "dataTier", inputOutTier)
+                    saveChanges = True
 
     for task in HELPER.getAllTasks():
         if task.taskType() in ["Production", "Processing", "Skim"]:
