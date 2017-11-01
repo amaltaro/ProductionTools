@@ -219,8 +219,7 @@ def getWMBSInfo(config):
     print("\n*** WORKFLOWS: there are %d distinct workflows not completed." % len(workflows))
     printWfStatus(workflows, workflowsDict)
 
-    wfsNotInjected = formatter.format(myThread.dbi.processData(workflowsNotInjected))
-    wfsNotInjected = [wf['name'] for wf in wfsNotInjected]
+    wfsNotInjected = flattenList(formatter.format(myThread.dbi.processData(workflowsNotInjected)))
     print("\n*** WORKFLOWS: found %d workflows not fully injected." % len(wfsNotInjected))
     printWfStatus(wfsNotInjected, workflowsDict)
 
