@@ -64,6 +64,7 @@ def main():
                 dupOutputPkl[pklPath] = {'lfn': e['lfn'],
                                          'exitCode': jobReport.getExitCode(),
                                          'taskSuccess': jobReport.taskSuccessful()}
+                break
             else:
                 lfn2PklDict[e['lfn']] = pklPath
     msg += "with a total of %d output files and %d duplicated" % (len(lfn2PklDict), len(dupOutputPkl))
