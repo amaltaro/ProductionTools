@@ -35,11 +35,7 @@ def main():
     """
     _main_
 
-    Pass either -v or --verbose to get verbose output :)
     """
-    ### Initial setup
-    verbose = True if len(sys.argv) == 2 else False
-    verboseData = []
     if 'WMAGENT_CONFIG' not in os.environ:
         os.environ['WMAGENT_CONFIG'] = '/data/srv/wmagent/current/config/wmagent/config.py'
     if 'manage' not in os.environ:
@@ -51,19 +47,37 @@ def main():
     out, err = p.communicate()
     logFiles = [line for line in out.splitlines() if 'install/wmagent/JobCreator/JobCache' in line]
     logFiles = [i.split()[2] for i in logFiles]
-    print("Found %d pickle files to parse" % len(logFiles))
+    msg = "Found %d pickle files to parse " % len(logFiles)
 
     ### Now unpickle each of these files and get their output files
-    dictOutputPkl = {}
+    # also check whether any of them are duplicate
+    lfn2PklDict = {}
+    dupOutputPkl = {}  # string value with the dup LFN and keyed by the pickle file path
     jobReport = Report()
     for pklPath in logFiles:
         if not os.path.exists(pklPath):
             continue
+
         jobReport.load(pklPath)
         for e in jobReport.getAllFiles():
-            dictOutputPkl[e['lfn']] = pklPath
-    listOutputPkl = [outFile for outFile in dictOutputPkl]
-    print("with a total of %d output files" % len(listOutputPkl))
+            if e['lfn'] in lfn2PklDict:
+                dupOutputPkl[pklPath] = {'lfn': e['lfn'],
+                                         'exitCode': jobReport.getExitCode(),
+                                         'taskSuccess': jobReport.taskSuccessful()}
+            else:
+                lfn2PklDict[e['lfn']] = pklPath
+    msg += "with a total of %d output files and %d duplicated" % (len(lfn2PklDict), len(dupOutputPkl))
+    msg += " files to process among them. See dupPickles.json for further details\n"
+    print(msg)
+    with open('dupPickles.json', 'w') as fo:
+        json.dump(dupOutputPkl, fo, indent=2)
+
+    if dupOutputPkl:
+        var = raw_input("Can we automatically delete those pickle files? Y/N\n")
+        if var == "Y":
+            for fPath in dupOutputPkl:
+                os.remove(fPath)
+            print("  Done!")
 
     ### Time to load all - this is BAD - LFNs from WMBS database
     connectToDB()
@@ -75,32 +89,25 @@ def main():
     print("Retrieved %d lfns from wmbs_file_details" % len(lfnsDB))
 
     ### Compare what are the duplicates
-    dupFiles = list(set(listOutputPkl) & set(lfnsDB))
-    print("\nFound %d duplicate files:\n%s" % (len(dupFiles), pformat(dupFiles)))
-    badFiles = sorted([dictOutputPkl[fil] for fil in dupFiles])
-    print("Corresponding to %d bad pkl files, they are:" % len(badFiles))
-    for filename in badFiles:
-        print(filename)
+    dupFiles = list(set(lfn2PklDict.keys()) & set(lfnsDB))
+    print("\nFound %d duplicate files." % len(dupFiles))
+    if len(dupFiles) == 0:
+        sys.exit(0)
+
+    ### Print some basic data about these reports
+    print("Their overview is: ")
+    dupOutputPkl = {}
+    for fname in dupFiles:
+        pklPath = lfn2PklDict[fname]
+        jobReport.load(pklPath)
+        dupOutputPkl[pklPath] = {'lfn': fname,
+                                 'exitCode': jobReport.getExitCode(),
+                                 'taskSuccess': jobReport.taskSuccessful()}
+    print(pformat(dupOutputPkl))
     print("")
 
-    ### Bonus, go deeper and check the status of these pickle files
-    jobReport = Report()
-    for f in badFiles:
-        print("Parsing %s ..." % f)
-        jobReport.load(f)
-        jobSucceeded = jobReport.taskSuccessful()
-        print("  Successful job: %s" % jobSucceeded)
-        print("  Job exit codes are: %s" % jobReport.getExitCodes())
-        if verbose:
-            verboseData.append(jobReport.__to_json__(None))
-
-    if verbose:
-        print("\nDumping all the FJRs content into verboseReport.json\n")
-        with open('verboseReport.json', 'w') as jo:
-            json.dump(verboseData, jo, indent=2)
-
-    print("\nRemove them, restart the component and be happy!")
-    return 0
+    print("Remove them, restart the component and be happy!\n")
+    sys.exit(0)
 
 
 if __name__ == '__main__':
