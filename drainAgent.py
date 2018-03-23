@@ -24,6 +24,7 @@ try:
     from WMCore.Configuration import loadConfigurationFile
     from WMCore.Services.RequestDB.RequestDBReader import RequestDBReader
     # from WMCore.DAOFactory import DAOFactory
+    from WMCore.WorkQueue.WorkQueueBackend import WorkQueueBackend
 except ImportError as e:
     print("You do not have a proper environment (%s), please source the following:" % str(e))
     print("source /data/srv/wmagent/current/apps/wmagent/etc/profile.d/init.sh")
@@ -199,6 +200,42 @@ def getCondorJobs():
     return jobDict
 
 
+def checkLocalWQStatus(config, workflows, workflowsDict):
+    """
+    Find workflows still in running state and check their local workqueue
+    elements status, just to make sure they are completely processed by this
+    agent.
+    """
+     ### Save those in running for a local workqueue check
+    runningWfs = []
+    for wf in workflows:
+        if workflowsDict[wf]['RequestStatus'] in ["running-open", "running-closed"]:
+            runningWfs.append(wf)
+
+    localWQBackend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue")
+    localWQInbox = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue_inbox")
+
+    print("\n*** WORKFLOWS: status of running workflows in local workqueue couch.")
+    for wf in runningWfs:
+        localDocIDs = localWQBackend.getElements(RequestName=wf)
+        localInboxDocIDs = localWQInbox.getElements(RequestName=wf)
+
+        print("\nSummary for request %s" % wf)
+        createElementsSummary(localDocIDs, localWQBackend.queueUrl)
+        createElementsSummary(localInboxDocIDs, localWQInbox.queueUrl)
+
+
+def createElementsSummary(elements, queueUrl):
+    """
+    Print the local couchdb situation based on the WQE status
+    """
+    summary = {'numberOfElements': len(elements), 'queueURL': queueUrl}
+    for elem in elements:
+        summary.setdefault(elem['Status'], 0)
+        summary[elem['Status']] += 1
+    print(summary)
+
+
 def getWMBSInfo(config):
     """
     blah
@@ -213,6 +250,8 @@ def getWMBSInfo(config):
     print("\n*** WORKFLOWS: found %d distinct workflows in this agent." % len(workflows))
     workflowsDict = fetchWorkflowsSpec(config, workflows)
     printWfStatus(workflows, workflowsDict)
+
+    checkLocalWQStatus(config, workflows, workflowsDict)
 
     workflows = formatter.formatDict(myThread.dbi.processData(incompleteWfs))
     workflows = [wf['name'] for wf in workflows]
