@@ -60,27 +60,42 @@ def main():
 
         jobReport.load(pklPath)
         for e in jobReport.getAllFiles():
-            if e['lfn'] in lfn2PklDict:
-                dupOutputPkl[pklPath] = {'lfn': e['lfn'],
-                                         'exitCode': jobReport.getExitCode(),
-                                         'taskSuccess': jobReport.taskSuccessful()}
-                break
-            else:
-                lfn2PklDict[e['lfn']] = pklPath
-    msg += "with a total of %d output files and %d duplicated" % (len(lfn2PklDict), len(dupOutputPkl))
-    msg += " files to process among them. See dupPickles.json for further details\n"
-    print(msg)
-    with open('dupPickles.json', 'w') as fo:
-        json.dump(dupOutputPkl, fo, indent=2)
+            lfn2PklDict.setdefault(e['lfn'], [])
+            lfn2PklDict[e['lfn']].append(pklPath)
 
-    if dupOutputPkl:
+    # now check which files contain more than one pickle path (= created by diff jobs)
+    dupFiles = []
+    for lfn, pkls in lfn2PklDict.iteritems():
+        if len(pkls) > 1:
+            dupFiles.append(lfn)
+            for pkl in pkls:
+                if pkl not in dupOutputPkl:
+                    jobReport.load(pkl)
+                    dupOutputPkl[pkl] = jobReport.__to_json__(None)
+                    dupOutputPkl[pkl]['dup_lfns'] = []
+                dupOutputPkl[pkl]['dup_lfns'].append(lfn)
+
+    msg += "with a total of %d output files and %d duplicated" % (len(lfn2PklDict), len(dupFiles))
+    msg += " files to process among them."
+    print(msg)
+
+    if dupFiles:
+        print("See dupPickles.json for further details ...")
+        with open('dupPickles.json', 'w') as fo:
+            json.dump(dupOutputPkl, fo, indent=2)
+
+    if dupFiles:
         var = raw_input("Can we automatically delete those pickle files? Y/N\n")
         if var == "Y":
-            for fPath in dupOutputPkl:
-                os.remove(fPath)
+            # then delete all job report files but the first one - NOT ideal
+            for fname in dupFiles:
+                for pklFile in lfn2PklDict[fname][1:]:
+                    print("Deleting %s ..." % pklFile)
+                    os.remove(pklFile)
             print("  Done!")
 
     ### Time to load all - this is BAD - LFNs from WMBS database
+    print("\nNow loading all LFNs from wmbs_file_details ...")
     connectToDB()
     myThread = threading.currentThread()
     formatter = DBFormatter(logging, myThread.dbi)
@@ -97,14 +112,23 @@ def main():
 
     ### Print some basic data about these reports
     print("Their overview is: ")
-    dupOutputPkl = {}
+    dbDupPkl = []
     for fname in dupFiles:
-        pklPath = lfn2PklDict[fname]
-        jobReport.load(pklPath)
-        dupOutputPkl[pklPath] = {'lfn': fname,
-                                 'exitCode': jobReport.getExitCode(),
-                                 'taskSuccess': jobReport.taskSuccessful()}
-    print(pformat(dupOutputPkl))
+        for pklPath in lfn2PklDict[fname]:
+            jobInfo = {'lfn': fname}
+            jobInfo['pklPath'] = pklPath
+
+            jobReport.load(pklPath)
+            jobInfo['exitCode'] = jobReport.getExitCode()
+            jobInfo['taskSuccess'] = jobReport.taskSuccessful()
+            jobInfo['EOSLogURL'] = jobReport.getLogURL()
+            jobInfo['HostName'] = jobReport.getWorkerNodeInfo()['HostName']
+            jobInfo['Site'] = jobReport.getSiteName()
+            jobInfo['task'] = jobReport.getTaskName()
+
+            dbDupPkl.append(jobInfo)
+
+    print(pformat(dbDupPkl))
     print("")
 
     print("Remove them, restart the component and be happy!\n")
