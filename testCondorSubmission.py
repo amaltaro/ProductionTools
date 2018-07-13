@@ -1,10 +1,9 @@
 """
 Requirements to run this script:
- * the WMAgent environment
  * condor_schedd daemon
- * memory_profiler library (which is not shipped with WMAgent, yet)
- * if you are submitting jobs for real, you might need to update some x509
- info in the code (proxy location and REPLACE-ME)
+
+Jobs are actually submitted to the local condor queue, but they won't
+run because the x509 ads were not properly set (see REPLACE-ME)
 """
 from __future__ import print_function
 
@@ -12,13 +11,14 @@ import os
 import re
 import sys
 import time
+import uuid
+import collections
 from copy import deepcopy
 
+import psutil
 import classad
 import htcondor
-from Utils.IteratorTools import convertFromUnicodeToStr
-from WMCore.Services.UUIDLib import makeUUID
-from memory_profiler import profile
+#from memory_profiler import profile
 
 TEST_DIR = '/data/srv/wmagent/current/alanTest/'
 reqStr = ('((REQUIRED_OS=?="any") || '
@@ -27,6 +27,30 @@ reqStr = ('((REQUIRED_OS=?="any") || '
           '(AuthenticatedIdentity =!= "volunteer-node@cern.ch")')
 
 x509Expr = 'ifThenElse("$$(GLIDEIN_CMSSite)" =?= "T3_CH_Volunteer",undefined,"%s")'
+
+
+def convertFromUnicodeToStr(data):
+    """
+    code fram
+    http://stackoverflow.com/questions/1254454/fastest-way-to-convert-a-dicts-keys-values-from-unicode-to-str
+    """
+    if isinstance(data, basestring):
+        return str(data)
+    elif isinstance(data, collections.Mapping):
+        return dict(list(map(convertFromUnicodeToStr, data.iteritems())))
+    elif isinstance(data, collections.Iterable):
+        return type(data)(list(map(convertFromUnicodeToStr, data)))
+    else:
+        return data
+
+
+def makeUUID():
+    """
+    _makeUUID_
+
+    Makes a UUID from the uuid class, returns it
+    """
+    return str(uuid.uuid4())
 
 
 def getClusterAd():
@@ -259,10 +283,8 @@ def getJobs(numJobs=1):
     return jobs
 
 
-profileFp = open('b.log', 'w+')
-
-
-@profile(stream=profileFp)
+#profileFp = open('b.log', 'w+')
+#@profile(stream=profileFp)
 def submitJobs():
     """Create all the necessary objects and submit to condor"""
     successfulJobs = []
@@ -284,10 +306,14 @@ def submitJobs():
 
 def main():
     # make it a different function such that gc can collect objects
-    for i in range(0, 50):
+    thisProcess = psutil.Process(os.getpid())
+    print("Initial memory RSS: %s" % thisProcess.memory_info().rss)
+    for i in range(1, 21):
         print("Running %i submission cycle" % i)
-        time.sleep(1)  # give enough time to gc to collect objects, if needed...
         submitJobs()
+        print("Current memory RSS: %s" % thisProcess.memory_info().rss)
+        time.sleep(10)  # give enough time to gc to collect objects, if needed...
+    print("Final memory RSS: %s" % thisProcess.memory_info().rss)
 
 
 if __name__ == "__main__":
