@@ -23,13 +23,15 @@ def getWMStatsData(workflow):
 
 def totalCERNFailures(data):
     summary = {k: v.get('failure') for k, v in data.items() if "CERN" in k}
-    total = 0
+    success = [v.get('success', 0) for k, v in data.items() if "CERN" in k]
+    success = sum(success)
+    fail = 0
     for site, values in summary.items():
         if values is None:
             continue
         for failtype, num in values.items():
-            total += num
-    return total
+            fail += num
+    return "%s/%s" % (success, fail)
 
 def main():
     data = getWMStatsData("pdmvserv_task_HIG-RunIIFall17wmLHEGS-01116__v1_T_180418_043017_9486")
@@ -38,21 +40,21 @@ def main():
     for agent in data.keys():
         print("\nStats for agent: %s" % agent)
         print("  Skipped files: %s" % pformat(data[agent]['skipped']))
-        print("  Overall agent status: %s" % pformat(data[agent]['status']))
+        print("  Overall agent status:\t\t %s" % data[agent]['status'])
         fail = totalCERNFailures(data[agent]['tasks']['/pdmvserv_task_HIG-RunIIFall17wmLHEGS-01116__v1_T_180418_043017_9486/HIG-RunIIFall17wmLHEGS-01116_0']['sites'])
-        print("  Task1 failures at CERN: %s" % fail)
+        print("  Task1 success/failures at CERN:                   %s" % fail)
         fail = totalCERNFailures(data[agent]['tasks']['/pdmvserv_task_HIG-RunIIFall17wmLHEGS-01116__v1_T_180418_043017_9486/HIG-RunIIFall17wmLHEGS-01116_0/HIG-RunIIFall17wmLHEGS-01116_0CleanupUnmergedLHEoutput']['sites'])
-        print("  Task1 Cleanup LHE failures at CERN: %s" % fail)
+        print("  Task1 Cleanup LHE success/failures at CERN:       %s" % fail)
         fail = totalCERNFailures(data[agent]['tasks']['/pdmvserv_task_HIG-RunIIFall17wmLHEGS-01116__v1_T_180418_043017_9486/HIG-RunIIFall17wmLHEGS-01116_0/HIG-RunIIFall17wmLHEGS-01116_0CleanupUnmergedRAWSIMoutput']['sites'])
-        print("  Task1 Cleanup RAWSIM failures at CERN: %s" % fail)
+        print("  Task1 Cleanup RAWSIM success/failures at CERN:    %s" % fail)
 
         fail = totalCERNFailures(data[agent]['tasks']['/pdmvserv_task_HIG-RunIIFall17wmLHEGS-01116__v1_T_180418_043017_9486/HIG-RunIIFall17wmLHEGS-01116_0/HIG-RunIIFall17DRPremix-00782_0']['sites'])
-        print("  Task2 failures at CERN: %s" % fail)
+        print("  Task2 success/failures at CERN:                   %s" % fail)
         fail = totalCERNFailures(data[agent]['tasks']['/pdmvserv_task_HIG-RunIIFall17wmLHEGS-01116__v1_T_180418_043017_9486/HIG-RunIIFall17wmLHEGS-01116_0/HIG-RunIIFall17DRPremix-00782_0/HIG-RunIIFall17DRPremix-00782_0CleanupUnmergedPREMIXRAWoutput']['sites'])
-        print("  Task2 Cleanup PREMIXRAW failures at CERN: %s" % fail)
+        print("  Task2 Cleanup PREMIXRAW success/failures at CERN: %s" % fail)
 
         fail = totalCERNFailures(data[agent]['tasks']['/pdmvserv_task_HIG-RunIIFall17wmLHEGS-01116__v1_T_180418_043017_9486/HIG-RunIIFall17wmLHEGS-01116_0/HIG-RunIIFall17DRPremix-00782_0/HIG-RunIIFall17DRPremix-00782_1']['sites'])
-        print("  Task3 failures at CERN: %s" % fail)
+        print("  Task3 success/failures at CERN:                   %s" % fail)
 
     print "Done!"
     sys.exit(0)
@@ -60,3 +62,4 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
