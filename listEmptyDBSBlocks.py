@@ -11,7 +11,7 @@ from dbs.apis.dbsClient import DbsApi
 
 def main():
     if len(sys.argv) != 2:
-        print("You must provide a dataset name. E.g.: python listEmptyDBSBlocks.py.py /EGamma/Run2018A-v1/RAW")
+        print("You must provide a dataset name. E.g.: python listEmptyDBSBlocks.py /EGamma/Run2018A-v1/RAW")
         sys.exit(1)
     dset = sys.argv[1]
 
