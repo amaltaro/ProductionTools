@@ -26,11 +26,12 @@ def updateSummary(summary, blockInfo):
 
 def main():
     if len(sys.argv) != 2:
-        print("You must provide a dataset name. E.g.: python listEmptyDBSBlocks.py.py /EGamma/Run2018A-v1/RAW")
+        print("You must provide a dataset name. E.g.: python listEmptyDBSBlocks.py /EGamma/Run2018A-v1/RAW")
         sys.exit(1)
     dset = sys.argv[1]
 
     summaryLoss = {}
+    badBlocks = []
     dbsApi = DbsApi(url='https://cmsweb.cern.ch/dbs/prod/global/DBSReader/')
     listBlocks = dbsApi.listBlocks(dataset=dset)
     for block in listBlocks:
@@ -39,7 +40,8 @@ def main():
             blockInfo = dbsApi.listFileSummaries(block_name=block['block_name'], validFileOnly=0)
             print("Block %s doesn't contain any valid files. Block summary: %s" % (block['block_name'], blockInfo))
             updateSummary(summaryLoss, blockInfo)
-
+            badBlocks.append(block['block_name'])
+    print("List of blocks that will be skipped:\n%s\n" % list(set(badBlocks)))
     print("Summary of blocks with all files invalid: %s" % summaryLoss)
 
 
