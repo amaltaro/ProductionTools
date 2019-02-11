@@ -77,6 +77,7 @@ def main():
 
     msg += "with a total of %d output files and %d duplicated" % (len(lfn2PklDict), len(dupFiles))
     msg += " files to process among them."
+    msg += "\nDuplicate files are:\n%s" % dupFiles
     print(msg)
 
     if dupFiles:
@@ -90,8 +91,11 @@ def main():
             # then delete all job report files but the first one - NOT ideal
             for fname in dupFiles:
                 for pklFile in lfn2PklDict[fname][1:]:
-                    print("Deleting %s ..." % pklFile)
-                    os.remove(pklFile)
+                    if os.path.isfile(pklFile):
+                        print("Deleting %s ..." % pklFile)
+                        os.remove(pklFile)
+                    else:
+                        print("    File has probably been already deleted %s ..." % pklFile)
             print("  Done!")
 
     ### Time to load all - this is BAD - LFNs from WMBS database
