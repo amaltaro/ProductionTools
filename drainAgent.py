@@ -9,13 +9,14 @@ redeployed) and:
  """
 from __future__ import print_function
 
-import sys
-import os
 import argparse
-import threading
 import logging
+import os
+import sys
+import threading
 from pprint import pprint, pformat
 from time import gmtime, strftime
+
 try:
     import htcondor as condor
     from Utils.IteratorTools import flattenList
@@ -29,7 +30,6 @@ except ImportError as e:
     print("You do not have a proper environment (%s), please source the following:" % str(e))
     print("source /data/srv/wmagent/current/apps/wmagent/etc/profile.d/init.sh")
     sys.exit(1)
-
 
 jobCountByState = """
     select wmbs_job_state.name, count(*) AS count
@@ -206,7 +206,7 @@ def checkLocalWQStatus(config, workflows, workflowsDict):
     elements status, just to make sure they are completely processed by this
     agent.
     """
-     ### Save those in running for a local workqueue check
+    ### Save those in running for a local workqueue check
     runningWfs = []
     for wf in workflows:
         if workflowsDict[wf]['RequestStatus'] in ["running-open", "running-closed"]:
@@ -233,7 +233,10 @@ def createElementsSummary(elements, queueUrl):
     for elem in elements:
         summary.setdefault(elem['Status'], 0)
         summary[elem['Status']] += 1
-    print(summary)
+    if set(summary.keys()) == set(['numberOfElements', 'queueURL', 'Done']):
+        print("Done in: %s" % summary['queueURL'])
+    else:
+        print(summary)
 
 
 def getWMBSInfo(config):
@@ -277,12 +280,14 @@ def getWMBSInfo(config):
     printWfStatus(unfinishedSubs, workflowsDict)
 
     filesAvailable = formatter.formatDict(myThread.dbi.processData(filesAvailWMBS))
-    print("\n*** SUBSCRIPTIONS: found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable),
-                                                                                                     filesAvailable))
+    print(
+        "\n*** SUBSCRIPTIONS: found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable),
+                                                                                                   filesAvailable))
 
     filesAcquired = formatter.formatDict(myThread.dbi.processData(filesAcqWMBS))
-    print("\n*** SUBSCRIPTIONS: found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired),
-                                                                                                      filesAcquired))
+    print(
+        "\n*** SUBSCRIPTIONS: found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired),
+                                                                                                    filesAcquired))
 
     blocksopenDBS = formatter.formatDict(myThread.dbi.processData(blocksOpenDBS))
     print("\n*** DBS: found %d blocks open in DBS." % len(blocksopenDBS), end="")
@@ -312,7 +317,6 @@ def parseArgs():
     return args
 
 
-
 def main():
     """
     Retrieve the following information from the agent:
@@ -329,7 +333,6 @@ def main():
       11. list of files not injected into phedex, without parent block
     """
     args = parseArgs()
-
 
     twiki = ('<pre>', '</pre>') if args.twiki else ('', '')
     print(twiki[0])
