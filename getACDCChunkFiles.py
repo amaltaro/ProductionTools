@@ -2,6 +2,7 @@ from __future__ import print_function
 import json
 import pickle
 import time
+import sys
 from pprint import pprint, pformat
 from WMCore.ACDC.DataCollectionService import DataCollectionService
 from WMCore.WorkQueue.DataStructs.ACDCBlock import ACDCBlock
@@ -12,12 +13,12 @@ from WMCore.WMSpec.WMWorkload import WMWorkloadHelper
 def main():
     start = time.time()
     # blockName = match['Inputs'].keys()[0]
-    blockName = "/acdc/vlimant_ACDC0_task_HIG-RunIIFall17wmLHEGS-01122__v1_T_180808_130708_5376/:pdmvserv_task_HIG-RunIIFall17wmLHEGS-01122__v1_T_180415_203643_8440:HIG-RunIIFall17wmLHEGS-01122_0:HIG-RunIIFall17DRPremix-00788_0/0/102323"
+    blockName = "/acdc/vlimant_ACDC0_task_SUS-RunIIFall18wmLHEGS-00025__v1_T_190218_145226_481/:pdmvserv_task_SUS-RunIIFall18wmLHEGS-00025__v1_T_181211_005112_2222:SUS-RunIIFall18wmLHEGS-00025_0/0/31055"
 
     # acdcInfo = match['ACDC']
     acdcInfo = {"database": "acdcserver",
-                "fileset": "/pdmvserv_task_HIG-RunIIFall17wmLHEGS-01122__v1_T_180415_203643_8440/HIG-RunIIFall17wmLHEGS-01122_0/HIG-RunIIFall17DRPremix-00788_0",
-                "collection": "pdmvserv_task_HIG-RunIIFall17wmLHEGS-01122__v1_T_180415_203643_8440",
+                "fileset": "/pdmvserv_task_SUS-RunIIFall18wmLHEGS-00025__v1_T_181211_005112_2222/SUS-RunIIFall18wmLHEGS-00025_0",
+                "collection": "pdmvserv_task_SUS-RunIIFall18wmLHEGS-00025__v1_T_181211_005112_2222",
                 "server": "https://cmsweb.cern.ch/couchdb"}
 
     acdc = DataCollectionService(acdcInfo["server"], acdcInfo["database"])
@@ -33,13 +34,20 @@ def main():
     block = {}
     block["Files"] = fileLists
 
+    wantedLumis = set([252052, 240646])
+    for f in fileLists:
+        for run in f['runs']:
+            maskDict = run.json()
+            lumisSet = set(maskDict['Lumis'].keys())
+            if wantedLumis.intersection(lumisSet):
+                print("File: %s with events: %s, contains these lumis: %s" % (f['lfn'], f['events'], wantedLumis.intersection(lumisSet)))
+
     # with open("chunkfiles.json", 'w') as fo:
     #     json.dump(block, fo)
-    with open("chunkfiles.pkl", 'w') as fo:
-        pickle.dump(block, fo)
 
     end = time.time()
     print("Spent %s secs running so far" % (end - start))
+    sys.exit(1)
 
     ### Now doing the WMBSHelper stuff
     reqUrl = "https://cmsweb.cern.ch/couchdb/reqmgr_workload_cache"
