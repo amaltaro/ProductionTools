@@ -12,8 +12,10 @@ from __future__ import print_function
 import argparse
 import logging
 import os
+import socket
 import sys
 import threading
+import time
 from pprint import pprint, pformat
 from time import gmtime, strftime
 
@@ -200,29 +202,41 @@ def getCondorJobs():
     return jobDict
 
 
-def checkLocalWQStatus(config, workflows, workflowsDict):
+def checkLocalWQStatus(config, status):
     """
-    Find workflows still in running state and check their local workqueue
-    elements status, just to make sure they are completely processed by this
-    agent.
+    Given a WorkQueueElement status, query local workqueue and workqueue_inbox
+    database for all elements in a given status and that were acquired by this agent.
     """
-    ### Save those in running for a local workqueue check
-    runningWfs = []
-    for wf in workflows:
-        if workflowsDict[wf]['RequestStatus'] in ["running-open", "running-closed"]:
-            runningWfs.append(wf)
+    backend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue")
+    backendInbox = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue_inbox")
 
-    localWQBackend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue")
-    localWQInbox = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue_inbox")
+    for db in ("workqueue", "workqueue_inbox"):
+        backend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name=db)
+        elements = backend.getElements(status=status)
+        for elem in elements:
+            updatedIn = time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.localtime(float(elem.updatetime)))
+            print("id: %s\tRequestName: %s\tStatus: %s\t\tUpdatedIn: %s" % (
+            elem.id, elem['RequestName'], elem['Status'], updatedIn))
+        print("Elements matching the criteria (%s, %s) are: %d" % (status, db, len(elements)))
+    return
 
-    print("\n*** WORKFLOWS: status of running workflows in local workqueue couch.")
-    for wf in runningWfs:
-        localDocIDs = localWQBackend.getElements(RequestName=wf)
-        localInboxDocIDs = localWQInbox.getElements(RequestName=wf)
 
-        print("\nSummary for request %s" % wf)
-        createElementsSummary(localDocIDs, localWQBackend.queueUrl)
-        createElementsSummary(localInboxDocIDs, localWQInbox.queueUrl)
+def checkGlobalWQStatus(config, status):
+    """
+    Given a WorkQueueElement status, query central workqueue database for
+    all elements in a given status and that were acquired by this agent.
+    """
+    agentUrl = "http://" + socket.gethostname() + ":5984"
+
+    backend = WorkQueueBackend(config.WorkloadSummary.couchurl)
+    elements = backend.getElements(status=status, ChildQueueUrl=agentUrl)
+
+    for elem in elements:
+        updatedIn = time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.localtime(float(elem.updatetime)))
+        print("id: %s\tRequestName: %s\tStatus: %s\t\tUpdatedIn: %s" % (
+        elem.id, elem['RequestName'], elem['Status'], updatedIn))
+    print("Elements matching the criteria (%s, %s) are: %d" % (status, agentUrl, len(elements)))
+    return
 
 
 def createElementsSummary(elements, queueUrl):
@@ -254,7 +268,13 @@ def getWMBSInfo(config):
     workflowsDict = fetchWorkflowsSpec(config, workflows)
     printWfStatus(workflows, workflowsDict)
 
-    checkLocalWQStatus(config, workflows, workflowsDict)
+    for st in ('Available', 'Negotiating', 'Acquired', 'Running'):
+        print("\n*** WORKQUEUE: elements still marked as %s in LQ workqueue / workqueue_inbox." % st)
+        checkLocalWQStatus(config, st)
+
+    for st in ("Acquired", "Running"):
+        print("\n*** WORKQUEUE: elements still marked as %s in GQ workqueue." % st)
+        checkGlobalWQStatus(config, st)
 
     workflows = formatter.formatDict(myThread.dbi.processData(incompleteWfs))
     workflows = [wf['name'] for wf in workflows]
@@ -280,14 +300,12 @@ def getWMBSInfo(config):
     printWfStatus(unfinishedSubs, workflowsDict)
 
     filesAvailable = formatter.formatDict(myThread.dbi.processData(filesAvailWMBS))
-    print(
-        "\n*** SUBSCRIPTIONS: found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable),
-                                                                                                   filesAvailable))
+    print("\n*** SUBSCRIPTIONS: found %d files available in WMBS (waiting for job creation):\n%s" % (len(filesAvailable),
+                                                                                                     filesAvailable))
 
     filesAcquired = formatter.formatDict(myThread.dbi.processData(filesAcqWMBS))
-    print(
-        "\n*** SUBSCRIPTIONS: found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired),
-                                                                                                    filesAcquired))
+    print("\n*** SUBSCRIPTIONS: found %d files acquired in WMBS (waiting for jobs to finish):\n%s" % (len(filesAcquired),
+                                                                                                      filesAcquired))
 
     blocksopenDBS = formatter.formatDict(myThread.dbi.processData(blocksOpenDBS))
     print("\n*** DBS: found %d blocks open in DBS." % len(blocksopenDBS), end="")
