@@ -30,12 +30,11 @@ def getProblematicRequests(epochT):
     print("Going to look for problematic elements for agent %s and epoch time %s" % (agentUrl, epochT))
     elements = backend.getElements(status="Running", ChildQueueUrl=agentUrl)
     for elem in elements:
-        if float(elem.updatetime) > epochT:
+        if float(elem.updatetime) > float(epochT):
             # element in the new agent, all good!
             continue
         updatedIn = time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.localtime(float(elem.updatetime)))
-        print("id: %s\tRequestName: %s\tStatus: %s\t\tUpdateIn: %s" % (
-        elem.id, elem['RequestName'], elem['Status'], updatedIn))
+        print("id: %s\tRequestName: %s\tStatus: %s\t\tUpdateIn: %s" % (elem.id, elem['RequestName'], elem['Status'], updatedIn))
         oldElems.append(elem)
     print("Found %d old elements out of %d Running in %s" % (len(oldElems), len(elements), agentUrl))
     return oldElems
