@@ -207,12 +207,14 @@ def checkLocalWQStatus(config, status):
     Given a WorkQueueElement status, query local workqueue and workqueue_inbox
     database for all elements in a given status and that were acquired by this agent.
     """
-    backend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue")
-    backendInbox = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name="workqueue_inbox")
+    backend = WorkQueueBackend(config.WorkQueueManager.couchurl)
 
     for db in ("workqueue", "workqueue_inbox"):
-        backend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name=db)
-        elements = backend.getElements(status=status)
+        if db == "workqueue":
+            elements = backend.getElements(status=status)
+        else:
+            elements = backend.getInboxElements(status=status)
+
         for elem in elements:
             updatedIn = time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.localtime(float(elem.updatetime)))
             print("id: %s\tRequestName: %s\tStatus: %s\t\tUpdatedIn: %s" % (
