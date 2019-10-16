@@ -1,24 +1,22 @@
 #!/usr/bin/env python
-#-*- coding: utf-8 -*-
-#pylint: disable=
+# -*- coding: utf-8 -*-
+# pylint: disable=
 """
 File       : test_blocks.py
 Author     : Valentin Kuznetsov <vkuznet AT gmail dot com>
 Description:
 """
 
-# system modules
-import os
-import re
-import sys
-import json
 import argparse
+import json
+# system modules
+import re
 from traceback import print_exc
 
 try:
     import cStringIO as StringIO
 except ImportError:
-    import io as StringIO # python3
+    import io as StringIO  # python3
 except ImportError:
     import StringIO
 
@@ -28,6 +26,7 @@ import psutil
 import sys
 from types import ModuleType, FunctionType
 from gc import get_referents
+
 
 def getSize(obj):
     """
@@ -44,7 +43,7 @@ def getSize(obj):
     BLACKLIST = type, ModuleType, FunctionType
 
     if isinstance(obj, BLACKLIST):
-        raise TypeError('getSize() does not take argument of type: '+ str(type(obj)))
+        raise TypeError('getSize() does not take argument of type: ' + str(type(obj)))
     seen_ids = set()
     size = 0
     objects = [obj]
@@ -58,44 +57,49 @@ def getSize(obj):
         objects = get_referents(*need_referents)
     return size
 
+
 float_number_pattern = \
     re.compile(r'(^[-]?\d+\.\d*$|^\d*\.{1,1}\d+$)')
 int_number_pattern = \
     re.compile(r'(^[0-9-]$|^[0-9-][0-9]*$)')
+
 
 class OptionParser():
     def __init__(self):
         "User based option parser"
         self.parser = argparse.ArgumentParser(prog='PROG')
         self.parser.add_argument("--fin", action="store",
-            dest="fin", default="", help="Input file")
+                                 dest="fin", default="", help="Input file")
+
 
 def size_format(uinput):
     """
     Format file size utility, it converts file size into KB, MB, GB, TB, PB units
     """
-    if  not (float_number_pattern.match(str(uinput)) or \
-                int_number_pattern.match(str(uinput))):
+    if not (float_number_pattern.match(str(uinput)) or \
+                    int_number_pattern.match(str(uinput))):
         return 'N/A'
     try:
         num = float(uinput)
     except Exception as exc:
         print_exc(exc)
         return "N/A"
-    base = 1000. # CMS convention to use power of 10
-    if  base == 1000.: # power of 10
+    base = 1000.  # CMS convention to use power of 10
+    if base == 1000.:  # power of 10
         xlist = ['', 'KB', 'MB', 'GB', 'TB', 'PB']
-    elif base == 1024.: # power of 2
+    elif base == 1024.:  # power of 2
         xlist = ['', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']
     for xxx in xlist:
-        if  num < base:
+        if num < base:
             return "%3.1f%s" % (num, xxx)
         num /= base
+
 
 def load(fin):
     with open(fin) as jo:
         data = json.load(jo)
     return data
+
 
 def create_stream(data):
     sdata = '[\n'
@@ -105,6 +109,7 @@ def create_stream(data):
         sdata += json.dumps(rec)
     sdata += '\n]'
     return StringIO.StringIO(sdata)
+
 
 def parse_stream(stream):
     data = []
@@ -119,11 +124,12 @@ def parse_stream(stream):
             break
     return data
 
+
 def print_mem(obj, data, mem, memIni=None):
     print("\nMemory usage for object: %s" % obj)
-    #tot = mem.total
-    #use = mem.used
-    if memIni:
+    # tot = mem.total
+    # use = mem.used
+    if False:
         tot = getattr(mem, "total", 0) - getattr(memIni, "total", 0)
         rss = getattr(mem, "rss", 0) - getattr(memIni, "rss", 0)
         pss = getattr(mem, "pss", 0) - getattr(memIni, "pss", 0)
@@ -138,6 +144,7 @@ def print_mem(obj, data, mem, memIni=None):
     print('RSS     memory: %s (%s)' % (rss, size_format(rss)))
     print('PSS     memory: %s (%s)' % (pss, size_format(pss)))
     print('USS     memory: %s (%s)' % (uss, size_format(uss)))
+
 
 def test(fin):
     "Perform main test with json data"
@@ -168,9 +175,10 @@ def test(fin):
 
 def main():
     "Main function"
-    optmgr  = OptionParser()
+    optmgr = OptionParser()
     opts = optmgr.parser.parse_args()
     test(opts.fin)
+
 
 if __name__ == '__main__':
     main()
