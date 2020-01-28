@@ -1,9 +1,6 @@
 """
-Requirements to run this script:
- * condor_schedd daemon
-
-Jobs are actually submitted to the local condor queue, but they won't
-run because the x509 ads were not properly set (see REPLACE-ME)
+Script to profile memory consumption for dictionary objects
+versus home made custom objects
 """
 from __future__ import print_function
 
@@ -33,7 +30,7 @@ class MSBlock():
 profileFp = open('slots.log', 'w+')
 @profile(stream=profileFp)
 def createSlots(numDsets):
-    """Create all the necessary objects and submit to condor"""
+    """Creates random datasets/blocks/size/location using custom objects"""
     data = {}
     for i in range(numDsets):
         dataset = randomString(100)
@@ -52,7 +49,7 @@ def createSlots(numDsets):
 profileFp = open('dicts.log', 'w+')
 @profile(stream=profileFp)
 def createDicts(numDsets):
-    """Create all the necessary objects and submit to condor"""
+    """Creates random datasets/blocks/size/location using dict objects"""
     data = {}
     for i in range(numDsets):
         dataset = randomString(100)
@@ -72,11 +69,15 @@ def main():
     # make it a different function such that gc can collect objects
     thisProcess = psutil.Process(os.getpid())
     print("Initial dict RSS: %s" % thisProcess.memory_info().rss)
+    tStart = time.time()
     createDicts(1000)
-    print("Final dict RSS: %s" % thisProcess.memory_info().rss)
+    totalTime = time.time() - tStart
+    print("Final dict RSS: %s took %s seconds" % (thisProcess.memory_info().rss, totalTime))
     print("Initial slots RSS: %s" % thisProcess.memory_info().rss)
+    tStart = time.time()
     createSlots(1000)
-    print("Final slots RSS: %s" % thisProcess.memory_info().rss)
+    totalTime = time.time() - tStart
+    print("Final slots RSS: %s took %s seconds" % (thisProcess.memory_info().rss, totalTime))
 
 
 if __name__ == "__main__":
