@@ -10,8 +10,8 @@ import os
 import sys
 from pprint import pformat
 
-url = 'cms-rucio-int.cern.ch'
-urlAuth = "cms-rucio-auth-int.cern.ch"
+url = 'cmsrucio-int.cern.ch'
+urlAuth = "cmsrucio-auth-int.cern.ch"
 
 
 def ping():
@@ -97,16 +97,54 @@ def getDID(token, dataId):
     return data
 
 
+def getFiles(token, dataId):
+    """
+    Provided a Rucio token and a data identifier, retrieve basic information
+    about the data object
+    """
+    if not token:
+        print("Received an invalid token: %s" % token)
+        return
+
+    headers = {"X-Rucio-Auth-Token": token,
+               "Content-type": "application/json",
+               "Accept": "application/x-json-stream"}
+
+    conn = httplib.HTTPSConnection(url)
+    urn = '/dids/cms/%s/files' % dataId
+    conn.request("GET", urn, headers=headers)
+    res = conn.getresponse()
+    if res.status != 200:
+        print("Failed to get DID from Rucio. Response status: %s and reason: %s" % (res.status, res.reason))
+        print("Output: %s" % res.read())
+        return
+    data = res.read()
+    for item in reader(data):
+        print(item)
+    return
+
+
+def reader(stream):
+    """
+    Home-made function to consume newline delimited json streaming data
+    """
+    for line in stream.split("\n"):
+        if line:
+            yield json.loads(line)
+
+
 def main():
     if len(sys.argv) != 2:
         print("usage: python getRucioDID.py <data identifier name>")
-        print("  Ex.: python getRucioDID.py /QCD_Pt_120to170_TuneCUETP8M1_13TeV_pythia8/RunIISummer16NanoAODv6-PUMoriond17_Nano25Oct2019_102X_mcRun2_asymptotic_v7_ext1-v1/NANOAODSIM")
+        print(
+            "  Ex.: python getRucioDID.py /QCD_Pt_120to170_TuneCUETP8M1_13TeV_pythia8/RunIISummer16NanoAODv6-PUMoriond17_Nano25Oct2019_102X_mcRun2_asymptotic_v7_ext1-v1/NANOAODSIM")
         sys.exit(0)
     did = sys.argv[1]
     ping()
     token = authenticate()
     validate(token)
     getDID(token, did)
+    getFiles(token, did)
 
     print("Done!")
 
