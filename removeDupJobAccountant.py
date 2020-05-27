@@ -122,7 +122,11 @@ def main():
             jobInfo = {'lfn': fname}
             jobInfo['pklPath'] = pklPath
 
-            jobReport.load(pklPath)
+            try:
+                jobReport.load(pklPath)
+            except IOError:
+                # pkl file has been deleted already
+                continue
             jobInfo['exitCode'] = jobReport.getExitCode()
             jobInfo['taskSuccess'] = jobReport.taskSuccessful()
             jobInfo['EOSLogURL'] = jobReport.getLogURL()
