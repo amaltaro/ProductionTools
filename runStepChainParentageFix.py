@@ -32,8 +32,8 @@ def getChildDatasetsForStepChainMissingParent(reqmgrDB, status, logger):
 
     for reqName, info in results.items():
         ### FIXME TODO fix only this one
-        if reqName != "cmsunified_task_TSG-Phase2HLTTDRWinter20GS-00091__v1_T_200219_195740_3852":
-            continue
+        # if reqName != "cmsunified_task_TSG-Phase2HLTTDRWinter20GS-00091__v1_T_200219_195740_3852":
+        #    continue
         ### done hacking
         logger.info("Request: %s needs fixing", reqName)
         for dsInfo in info.values():
@@ -93,7 +93,20 @@ def main():
                 logger.info("Parentage for '%s' successfully updated. Processed %s out of %s datasets.",
                             childDS, fixCount, totalChildDS)
         logger.info("    dataset sorted: %s\n", childDS)
-        sys.exit(0)
+
+    requestsToUpdate = requests - failedRequests
+
+    ### FIXME: disable the block below if you do NOT want to update the
+    # workflow in ReqMgr2
+    for request in requestsToUpdate:
+        try:
+            reqmgrDB.updateRequestProperty(request, {"ParentageResolved": True})
+            logger.info("Marked ParentageResolved=True for request: %s", request)
+        except Exception as exc:
+            logger.error("Failed to update 'ParentageResolved' flag to True for request: %s", request)
+
+    msg = "A total of %d requests have been processed, where %d will have to be retried in the next cycle."
+    logger.info(msg, len(requestsToUpdate), len(failedRequests))
 
     sys.exit(0)
 
