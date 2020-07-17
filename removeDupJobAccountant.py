@@ -139,7 +139,10 @@ def main():
     print(pformat(dbDupPkl))
     print("")
 
-    print("Remove them, restart the component and be happy!\n")
+    print("Remove these, restart the component and be happy:")
+    for job in dbDupPkl:
+        print(job['pklPath'])
+
     sys.exit(0)
 
 
