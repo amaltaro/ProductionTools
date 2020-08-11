@@ -32,14 +32,13 @@ def getChildDatasetsForStepChainMissingParent(reqmgrDB, status, logger):
 
     for reqName, info in results.items():
         ### FIXME TODO fix only this one
-        # if reqName != "cmsunified_task_TSG-Phase2HLTTDRWinter20GS-00091__v1_T_200219_195740_3852":
-        #    continue
+        if reqName != "cmsunified_task_EXO-RunIIFall18wmLHEGS-02833__v1_T_200220_091412_4231":
+           continue
         ### done hacking
         logger.info("Request: %s needs fixing", reqName)
         for dsInfo in info.values():
-            if dsInfo["ParentDset"]:
-                for childDS in dsInfo["ChildDsets"]:
-                    requestsByChildDataset[childDS].add(reqName)
+            for childDS in dsInfo["ChildDsets"]:
+                requestsByChildDataset[childDS].add(reqName)
     return requestsByChildDataset
 
 
