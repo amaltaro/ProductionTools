@@ -49,8 +49,7 @@ def main():
 
     dbs_url = "https://cmsweb.cern.ch/dbs/prod/global/DBSWriter"
     reqmgrdb_url = "%s/reqmgr_workload_cache" % (COUCH_URL)
-    # statusToCheck = ['closed-out', 'announced', 'normal-archived']
-    statusToCheck = ['normal-archived']
+    statusToCheck = ['closed-out', 'announced']
 
     logger = setupLogger()
     dbsSvc = DBS3Reader(dbs_url, logger=logger)
@@ -76,7 +75,7 @@ def main():
     totalChildDS = len(childDatasets)
     fixCount = 0
     for childDS in childDatasets:
-        logger.info("\nResolving parentage for dataset: %s", childDS)
+        logger.info("Resolving parentage for dataset: %s", childDS)
         try:
             failedBlocks = dbsSvc.fixMissingParentageDatasets(childDS, insertFlag=True)
         except Exception as exc:
