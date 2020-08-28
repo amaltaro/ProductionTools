@@ -8,13 +8,16 @@ from __future__ import print_function, division
 import sys
 import os
 import json
+import datetime
 from random import choice
 from rucio.client import Client
 
 SCOPE = "cms"
 ACCT = "wma_prod"
-### This container contains 3 blocks
-DSET = "/ST_FCNC-TH_Thadronic_HToWWZZtautau_Ctcphi_CtcG_CP5_13TeV-mcatnlo-madspin-pythia8/RunIIFall17NanoAODv6-PU2017_12Apr2018_Nano25Oct2019_102X_mc2017_realistic_v7-v1/NANOAODSIM"
+DID_TYPE = "DATASET"
+DSET = "/Neutrino_E-10_gun/RunIISummer19ULPrePremix-UL18_106X_upgrade2018_realistic_v11_L1v1-v2/PREMIX"
+DSET2 = "/ST_FCNC-TH_Thadronic_HToWWZZtautau_Ctcphi_CtcG_CP5_13TeV-mcatnlo-madspin-pythia8/RunIIFall17NanoAODv6-PU2017_12Apr2018_Nano25Oct2019_102X_mc2017_realistic_v7-v1/NANOAODSIM"
+STUCK_LIMIT = 7  # 7 days
 SITE_WHITE_LIST = ["T2_CH_CERN", "T1_US_FNAL"]
 
 if not os.getenv("X509_USER_CERT") or not os.getenv("X509_USER_KEY"):
@@ -50,78 +53,70 @@ def main():
     ### we also have to store all its blocks to find out the final container location
     print("Calculating the total secondary size...")
     secondaryInfo = {DSET: {"bytes": 0, "locations": [], "blocks": []}}
-    resp = client.list_dids(SCOPE, filters={'name': DSET}, long=True, recursive=True)
+    resp = client.list_dids(SCOPE, filters={'name': DSET + "#*", "type": DID_TYPE}, long=True)
     for item in resp:
-        if item['did_type'] == "DATASET":
-            secondaryInfo[DSET]["bytes"] += item['bytes']
-            secondaryInfo[DSET]["blocks"].append(item['name'])
+        secondaryInfo[DSET]["bytes"] += item['bytes']
+        secondaryInfo[DSET]["blocks"].append(item['name'])
     print("Dataset: {} has bytes: {}\n".format(DSET, secondaryInfo[DSET]["bytes"]))
 
     ### STEP-2: first, check whether there are container level rules that our
     ### own account might have already created (this can save a bunch of other Rucio calls!)
     secondaryRules = []
-    resp = client.list_did_rules(SCOPE, DSET)
+    resp = client.list_replication_rules(filters={"scope": SCOPE, "name": DSET, "account": ACCT, "grouping": "A"})
+    dateTimeNow = datetime.datetime.now()
     for item in resp:
-        if item['account'] == ACCT and item['grouping'] == "ALL":
-            secondaryRules.append(item)
-    ### now figure out the RSE expression and try to pin point things to a specific location
-    if not secondaryRules:
-        print("There are no rules for container: {}, account: {}, grouping=ALL".format(DSET, ACCT))
-    for rule in secondaryRules:
-        resp = client.list_rses(rule['rse_expression'])
-        rses = [item['rse'] for item in resp]
-        ### FIXME: does it make sense?
-        if rule['copies'] == len(rses):
-            msg = "Rule id: {}, account: {}, grouping: {}, copies: {} has the\n\tdataset: {}"
-            msg += "\n\tlocked at RSEs: {}"
-            print(msg.format(rule['id'], rule['account'], rule['grouping'], rule['copies'], rule['name'], rses))
-            # remove that dataset from the input data placement
-            secondaryInfo.pop(rule['name'])
-            break
-    if not secondaryInfo:
-        print("There are no pileup container to be transferred! Exiting...")
-        sys.exit(0)
+        ### FIXME: should we bother about any other state?
+        if item['state'] == "SUSPENDED":
+            print("WARNING: Dataset: {} has a SUSPENDED rule. Rule info: {}".format(DSET, item))
+            continue
+        elif item['state'] == "STUCK":
+            stuckAt = item['stuck_at']
+            timeDiff = dateTimeNow - stuckAt
+            if int(timeDiff.days) > STUCK_LIMIT:
+                msg = "WARNING: Dataset: {} has a STUCK rule for longer than {} days.".format(DSET, timeDiff.days)
+                msg += " Not going to use it! Rule info: {}".format(item)
+                print(msg)
+                continue
+            else:
+                msg = "WARNING: Dataset: {} has a STUCK rule for only {} days.".format(DSET, timeDiff.days)
+                msg += " Considering it for the pileup location"
+                print(msg)
+        ### NOTE that MSTransferor will only make container-level data placement for pileups
+        ### and those ALWAYS target a single RSE, so the expression here should actually
+        ### be the final RSE where data is
+        secondaryInfo[DSET]["locations"].append(item['rse_expression'])
+        secondaryRules.append(item)
 
-    ### STEP-3: figure out the final container location (common location between all the blocks)
-    # FIXME: pretty inefficient!!! We will likely have to cache pileup container location for a few hours, and
-    # of course, keep it updated with whatever write actions we take
-    blocksRSEs = []
-    for block in secondaryInfo[DSET]["blocks"]:
-        resp = client.get_dataset_locks(SCOPE, block)
-        rses = set()
-        for item in resp:
-            if item['account'] == ACCT:
-                rses.add(item['rse'])
-        print("Block: {}, is locked under RSE: {} by the rucio account: {}".format(block,
-                                                                                   rses,
-                                                                                   ACCT))
-        blocksRSEs.append(rses)
-    ### Check the final container location
-    ### FIXME: we likely need to have a container presence by RSE metric, such that we can make
-    ### an intelliggent data placement (easy to count that as block numbers, but better with block sizes)
-    finalContainerRSEs = blocksRSEs[0] if blocksRSEs else set()
-    for blockRSE in blocksRSEs:
-        finalContainerRSEs = finalContainerRSEs & blockRSE
-    secondaryInfo[DSET]['locations'] = finalContainerRSEs
-    ### FIXME: list of blocks is no longer needed here, release memory
-    secondaryInfo[DSET].pop("blocks")
-
-    ### STEP-4: compare containers location with the current SiteWhitelist, and remove containers already in place
-    for container in list(secondaryInfo):
-        commonLocation = set(SITE_WHITE_LIST) & set(secondaryInfo[DSET]['locations'])
+    ### STEP-3: check whether container location/lock and SiteWhitelist have any RSEs in common
+    ### triggering a new rule creation or not
+    if not secondaryInfo[DSET]["locations"]:
+        print("Pileup {} is not available anywhere. A container-level rule will have to be created".format(DSET))
+    else:
+        commonLocation = set(SITE_WHITE_LIST) & set(secondaryInfo[DSET]["locations"])
         if commonLocation:
-            print("Dropping container: {} from data placement, it's already available at: {}".format(block, commonLocation))
-            secondaryInfo.pop(container)
+            msg = "Pileup {} has a common location with the workflow SiteWhitelist.".format(DSET)
+            msg += " No need to create another rule! Common RSEs are: {}".format(commonLocation)
+            print(msg)
+            sys.exit(0)
+        else:
+            msg = "Pileup {} has current locations: {}, while the SiteWhitelist is: {}".format(DSET,
+                                                                                               secondaryInfo[DSET]["locations"],
+                                                                                               SITE_WHITE_LIST)
+            msg += " It has no common locations and a new rule needs to be created. "
+            msg += "Or if it's a PREMIX pileup, this workflow should actually fail assignment unless AAA is enabled"
+            print(msg)
 
-    ### STEP-5: figure out the RSE quotas and make a rule against the best site (single copy)
-    kwargs = dict(grouping="ALL", account=ACCT, comment="MSTransferor",
+    ### STEP-4: using Eric's function to select the best RSE within the SiteWhitelist (and primary locations)
+    ### create a new container-lelve rule for this pileup
+    kwargs = dict(grouping="ALL", account=ACCT, comment="MSTransferor Pileup",
                   activity="MSTransferor Input Data Placement")
     for container in secondaryInfo:
         copies = 1
+        ### FIXME TODO Use Erics function to find out which RSE to use
         rseExpr = choice(SITE_WHITE_LIST)
         # FIXME: keeping the rule creation commented out
         resp = "fake_rule_id"
-        #resp = client.add_replication_rule(container, copies, rseExpr, **kwargs)
+        # resp = client.add_replication_rule(container, copies, rseExpr, **kwargs)
         print("\nRule id: {} created for\n\tRSEs: {}\n\tDID: {}".format(resp, rseExpr, container))
 
 

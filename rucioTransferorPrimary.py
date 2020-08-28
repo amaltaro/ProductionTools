@@ -13,6 +13,7 @@ from rucio.client import Client
 
 SCOPE = "cms"
 ACCT = "wma_prod"
+DID_TYPE = "DATASET"
 ### This container contains 3 blocks
 DSET = "/ST_FCNC-TH_Thadronic_HToWWZZtautau_Ctcphi_CtcG_CP5_13TeV-mcatnlo-madspin-pythia8/RunIIFall17NanoAODv6-PU2017_12Apr2018_Nano25Oct2019_102X_mc2017_realistic_v7-v1/NANOAODSIM"
 SITE_WHITE_LIST = ["T2_CH_CERN", "T1_US_FNAL"]
@@ -47,38 +48,18 @@ def main():
     print("Using:\n\tscope: {}\n\taccount: {}\n\tcontainer: {}\n".format(SCOPE, ACCT, DSET))
 
     ### STEP-1: provided a container name, find all its blocks and their sizes
-    print("Finding out all the blocks present in the primary dataset: {}".format(DSET))
+    print("Finding all the blocks present in the primary dataset: {}".format(DSET))
     primaryInfo = {DSET: {}}
-    resp = client.list_dids(SCOPE, filters={'name': DSET}, long=True, recursive=True)
+    resp = client.list_dids(SCOPE, filters={'name': DSET + "#*", "type": DID_TYPE}, long=True)
     for item in resp:
-        if item['did_type'] == "DATASET":
-            primaryInfo[DSET].setdefault(item['name'], {})
-            primaryInfo[DSET][item['name']]['blockSize'] = item['bytes']
-            primaryInfo[DSET][item['name']]['locations'] = []
-            print("Found block: {}, with size: {}".format(item['name'], item['bytes']))
+        primaryInfo[DSET].setdefault(item['name'], {})
+        primaryInfo[DSET][item['name']]['blockSize'] = item['bytes']
+        primaryInfo[DSET][item['name']]['locations'] = []
+        print("Found block: {}, with size: {}".format(item['name'], item['bytes']))
 
-    ### STEP-2: now that we know all the block names, find their current location and
-    ### where they have been locked with a rule created by our own account
-    for block in primaryInfo[DSET]:
-        resp = client.get_dataset_locks(SCOPE, block)
-        for item in resp:
-            if item['account'] == ACCT:
-                print("Block: {}, is locked under RSE: {} by the rucio account: {}".format(block,
-                                                                                           item['rse'],
-                                                                                           item['account']))
-                primaryInfo[DSET][item['name']]['locations'].append(item['rse'])
-    print("\nAt this stage, we know the block names, their sizes, and where they are currently available and locked:")
-    pprint(primaryInfo)
-
-    ### STEP-3: compare blocks location with the current SiteWhitelist, and remove blocks already in place
-    for block in list(primaryInfo[DSET]):
-        commonLocation = set(SITE_WHITE_LIST) & set(primaryInfo[DSET][block]['locations'])
-        if commonLocation:
-            print("Dropping block: {} from data placement, it's already available at: {}".format(block, commonLocation))
-            primaryInfo[DSET].pop(block)
-
-    ### STEP-4: figure out the RSE quotas and make a rule against those sites in the white list (or a
-    ### sub-set of it)
+    ### STEP-2: if there is pileup dataset, then we need to intersect the SiteWhitelist
+    ### with the current pileup container location (where the container is locked)
+    ### otherwise, just make a rule for all the blocks to the workflow SiteWhitelist (grouping=DATASET)
     kwargs = dict(grouping="DATASET", account=ACCT, comment="MSTransferor",
                   activity="MSTransferor Input Data Placement")
     dids = primaryInfo[DSET].keys()
