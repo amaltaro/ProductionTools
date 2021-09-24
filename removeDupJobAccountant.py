@@ -42,10 +42,10 @@ def main():
         os.environ['manage'] = '/data/srv/wmagent/current/config/wmagent/manage'
 
     ### Fetch the report pickle files from the component log
-    command = ["tail", "-n1000", "install/wmagent/JobAccountant/ComponentLog"]
-    p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    command = ["tail", "-n1000", "/data/srv/wmagent/current/install/wmagentpy3/JobAccountant/ComponentLog"]
+    p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", text=True)
     out, err = p.communicate()
-    logFiles = [line for line in out.splitlines() if 'install/wmagent/JobCreator/JobCache' in line]
+    logFiles = [line for line in out.splitlines() if 'install/wmagentpy3/JobCreator/JobCache' in line]
     logFiles = [i.split()[2] for i in logFiles]
     msg = "Found %d pickle files to parse " % len(logFiles)
 
@@ -65,7 +65,7 @@ def main():
 
     # now check which files contain more than one pickle path (= created by diff jobs)
     dupFiles = []
-    for lfn, pkls in lfn2PklDict.iteritems():
+    for lfn, pkls in lfn2PklDict.items():
         if len(pkls) > 1:
             dupFiles.append(lfn)
             for pkl in pkls:
@@ -86,8 +86,9 @@ def main():
             json.dump(dupOutputPkl, fo, indent=2)
 
     if dupFiles:
-        var = raw_input("Can we automatically delete those pickle files? Y/N\n")
-        if var == "Y":
+        print("Can we automatically delete those pickle files (Y/N)? ")
+        answer = input()
+        if answer.upper() == "Y":
             # then delete all job report files but the first one - NOT ideal
             for fname in dupFiles:
                 for pklFile in lfn2PklDict[fname][1:]:
