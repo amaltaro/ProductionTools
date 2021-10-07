@@ -11,22 +11,17 @@ In case it finds these documents, then it will ask for their deletion.
 Created on Apr 27, 2015.
 @author: amaltaro
 """
+from __future__ import print_function
 
 import sys, os
-
+from pprint import pformat
 from WMCore.Configuration import loadConfigurationFile
-from WMCore.Services.RequestDB.RequestDBReader import RequestDBReader
-from WMComponent.JobCreator.JobCreatorPoller     import retrieveWMSpec
 
 from WMCore.Database.CMSCouch import Database
 from WMCore.WorkQueue.WorkQueueBackend import WorkQueueBackend
 
-#TODO: set all these statuses back when testing is finished 
-# final_status = ['aborted', 'rejected', 'aborted-completed', 'aborted-archived']
-final_status = ['completed']
+KEYNAME = 'WMCore.WorkQueue.DataStructs.WorkQueueElement.WorkQueueElement'
 
-# TODO: fix the deletion of the spec file
-# TODO: implement deletion when there is no input workflow
 
 def main():
     """
@@ -34,96 +29,43 @@ def main():
     have provided or it will loop over the final (or almost final)
     states and ask for your permission to delete them.
     """
-    wfName = sys.argv[1] if len(sys.argv) == 2 else []
-
     if 'WMAGENT_CONFIG' not in os.environ:
         os.environ['WMAGENT_CONFIG'] = '/data/srv/wmagent/current/config/wmagent/config.py'
-
     config = loadConfigurationFile(os.environ["WMAGENT_CONFIG"])
 
-    # Instantiating central services (couch stuff)
-#    print "Central Couch URL  : %s" % config.WorkloadSummary.couchurl
-#    print "Central ReqMgr URL  : %s\n" % config.AnalyticsDataCollector.centralRequestDBURL
+    if len(sys.argv) != 2:
+        print("You must provide an input file name as argument")
+        sys.exit(1)
 
-    wfDBReader = RequestDBReader(config.AnalyticsDataCollector.centralRequestDBURL, 
-                                 couchapp = config.AnalyticsDataCollector.RequestCouchApp)
+    fileName = sys.argv[1]
+    workflowsList = []
+    with open(fileName) as fobj:
+        lines = fobj.readlines()
+        for line in lines:
+            workflowsList.append(line.replace('\n', '').strip())
+    print("Going to check on {} workflows".format(len(workflowsList)))
 
     # Central services
     wqBackend = WorkQueueBackend(config.WorkloadSummary.couchurl)
     wqInboxDB = Database('workqueue_inbox', config.WorkloadSummary.couchurl)
 
-    # Local services
-    localWQBackend = WorkQueueBackend(config.WorkQueueManager.couchurl, db_name = "workqueue_inbox")
-    localWQInboxDB = Database('workqueue', config.WorkQueueManager.couchurl)
-
-    statusList = ["failed", "epic-FAILED", "completed", "closed-out",
-                  "announced", "aborted", "aborted-completed", "rejected",
-                  "normal-archived", "aborted-archived", "rejected-archived"]
-
-    for stat in final_status:
-        # retrieve list of workflows in each status
-        if not wfName:
-#            options = {'include_docs': False}
-            date_range = {'startkey': [2015,5,15,0,0,0], 'endkey': [2015,5,26,0,0,0]}
-#            finalWfs = wfDBReader.getRequestByCouchView("bydate", options, date_range)
-            tempWfs = wfDBReader.getRequestByCouchView("bydate", date_range)
-            #print "Found %d wfs in status: %s" %(len(finalWfs), stat)
-            finalWfs = []
-            for wf, content in tempWfs.iteritems():
-                if content['RequestStatus'] in statusList:
-                  finalWfs.append(wf)
-            print "Found %d wfs in not in active state" % len(finalWfs)
+    for wfName in workflowsList:
+        # check whether there are workqueue_inbox docs
+        msg = ""
+        if wqInboxDB.documentExists(wfName):
+            wqInboxDoc = wqInboxDB.document(wfName)
+            #print("Inbox document for {} is\n{}".format(wfName, pformat(wqInboxDoc)))
+            msg += "Workflow {} has {} rejected input blocks ".format(wfName, wqInboxDoc[KEYNAME]['RejectedInputs'])
+            #print("Inbox document for {} has is\n{}".format(wfName, pformat(wqInboxDoc)))
         else:
-            finalWfs = [wfName]
-            tempWfs = wfDBReader.getRequestByNames(wfName, True)
-            print "Checking %s with status '%s'." % (wfName, tempWfs[wfName]['RequestStatus'])
+            msg += "ERROR: inbox document not found for {} ".format(wfName)
 
-        wqDocs, wqInboxDocs = [], []
-        localWQDocs, localWQInboxDocs = [], []
-        for counter, wf in enumerate(finalWfs):
-            if counter % 100 == 0:
-                print "%d wfs queried ..." % counter
-            # check whether there are workqueue docs
-            wqDocIDs = wqBackend.getElements(WorkflowName = wf)
-            if wqDocIDs:
-                print "Found %d workqueue docs for %s, status %s" % (len(wqDocIDs), wf, tempWfs[wf]['RequestStatus'])
-                print wqDocIDs
-                wqDocs.append(wqDocIDs)
+        # check whether there are workqueue docs
+        wqDocIDs = wqBackend.getElements(WorkflowName=wfName, returnIdOnly=True)
+        msg += "and it has {} workqueue elements".format(len(wqDocIDs))
+        #print("    and it has {} workqueue elements".format(len(wqDocIDs)))
+        print(msg)
 
-            # check whether there are workqueue_inbox docs
-            if wqInboxDB.documentExists(wf):
-                print "Found workqueue_inbox doc for %s, status %s" % (wf, tempWfs[wf]['RequestStatus'])
-                # then retrieve the document
-                wqInboxDoc = wqInboxDB.document(wf)
-                wqInboxDocs.append(wqInboxDoc)
-
-            # check local queue
-            wqDocIDs = localWQBackend.getElements(WorkflowName = wf)
-            if wqDocIDs:
-                print "Found %d local workqueue docs for %s, status %s" % (len(wqDocIDs), wf, tempWfs[wf]['RequestStatus'])
-                print wqDocIDs
-                localWQDocs.append(wqDocIDs)
-            if localWQInboxDB.documentExists(wf):
-                print "Found local workqueue_inbox doc for %s, status %s" % (wf, tempWfs[wf]['RequestStatus'])
-                wqInboxDoc = localWQInboxDB.document(wf)
-                print wqInboxDoc
-                localWQInboxDocs.append(wqInboxDoc)
-
-    # TODO TODO TODO for the moment only deletes for a specific workflow
-    if wfName:
-        var = raw_input("\nCan we delete all these documents (Y/N)? ")
-        if var == "Y":
-            # deletes workqueue_inbox doc
-            if wqInboxDoc:
-                print "Deleting workqueue_inbox id %s and %s" % (wqInboxDoc['_id'], wqInboxDoc['_rev'])
-                wqInboxDB.delete_doc(wqInboxDoc['_id'], wqInboxDoc['_rev'])
-
-            # deletes workqueue docs
-            if wqDocIDs:
-                print "Deleting workqueue docs %s" % wqDocIDs
-                wqBackend.deleteElements(*[x for x in wqDocIDs if x['RequestName'] in wfName])
-        else:
-            print "You are the boss, aborting it ...\n"
 
 if __name__ == "__main__":
     sys.exit(main())
