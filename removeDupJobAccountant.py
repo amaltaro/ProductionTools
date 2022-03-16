@@ -47,7 +47,9 @@ def main():
     out, err = p.communicate()
     logFiles = [line for line in out.splitlines() if 'install/wmagentpy3/JobCreator/JobCache' in line]
     logFiles = [i.split()[2] for i in logFiles]
-    msg = "Found %d pickle files to parse " % len(logFiles)
+    # now make these paths unique
+    logFiles = list(set(logFiles))
+    msg = "Found %d unique pickle files to parse " % len(logFiles)
 
     ### Now unpickle each of these files and get their output files
     # also check whether any of them are duplicate
