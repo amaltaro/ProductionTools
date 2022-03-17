@@ -13,33 +13,22 @@ from urllib.parse import urlparse, ParseResult
 def portForward(port):
     """1st option: decorate class methods"""
     def portForwardDecorator(callFunc):
-        urlMangleList = ['https://tivanov',
-                         'https://alancc',
-                         'https://cmsweb']
+        urlToMangle = 'https://cmsweb'
 
         def portMangle(callObj, url, *args, **kwargs):
-            # As a first step try to get a logger from the calling object:
-            if callable(getattr(callObj, 'logger', None)):
-                logger = callObj.logger
-            else:
-                logger = logging.getLogger()
 
             forwarded = False
             try:
                 oldUrl = urlparse(url)
                 found = False
                 if isinstance(url, str):
-                    for mUrl in urlMangleList:
-                        if url.startswith(mUrl):
-                            netlocStr = u'%s:%d' % (oldUrl.hostname, port)
-                            found = True
-                            break
+                    if url.startswith(urlToMangle):
+                        netlocStr = u'%s:%d' % (oldUrl.hostname, port)
+                        found = True
                 elif isinstance(url, bytes):
-                    for mUrl in urlMangleList:
-                        if url.startswith(mUrl.encode('utf-8')):
-                            netlocStr = b'%s:%d' % (oldUrl.hostname, port)
-                            found = True
-                            break
+                    if url.startswith(urlToMangle):
+                        netlocStr = b'%s:%d' % (oldUrl.hostname, port)
+                        found = True
                 if found:
                     newUrl = ParseResult(scheme=oldUrl.scheme,
                                          netloc=netlocStr,
@@ -49,9 +38,12 @@ def portForward(port):
                                          fragment=oldUrl.fragment)
                     newUrl = newUrl.geturl()
                     forwarded = True
-            except Exception as ex:
-                msg = "Failed to forward url: %s to port: %s due to ERROR: %s"
-                logger.exception(msg, url, port, str(ex))
+            # try:
+            #     """3rd option: the simplest possible implementation"""
+            #     if url.startswith("https://cmsweb"):
+            #         newUrl = url.replace('.cern.ch/', '.cern.ch:8443/', 1)
+            except Exception:
+                pass
             if forwarded:
                 return callFunc(callObj, newUrl, *args, **kwargs)
             else:
@@ -73,10 +65,43 @@ class PortForward():
         return portForward(self.port)(dummyCall)(self, url)
 
 
-def replacePort(url):
+def stringReplFunc(url):
     """3rd option: the simplest possible implementation"""
     if url.startswith("https://cmsweb"):
         return url.replace('.cern.ch/', '.cern.ch:8443/', 1)
+
+
+def urlParseFunc(url):
+    urlToMangle = 'https:/cmsweb'
+    port = 8443
+
+    forwarded = False
+    try:
+        oldUrl = urlparse(url)
+        found = False
+        if isinstance(url, str):
+            if url.startswith(urlToMangle):
+                netlocStr = u'%s:%d' % (oldUrl.hostname, port)
+                found = True
+        elif isinstance(url, bytes):
+            if url.startswith(urlToMangle):
+                netlocStr = b'%s:%d' % (oldUrl.hostname, port)
+                found = True
+        if found:
+            newUrl = ParseResult(scheme=oldUrl.scheme,
+                                 netloc=netlocStr,
+                                 path=oldUrl.path,
+                                 params=oldUrl.params,
+                                 query=oldUrl.query,
+                                 fragment=oldUrl.fragment)
+            newUrl = newUrl.geturl()
+            forwarded = True
+    except Exception:
+        pass
+    if forwarded:
+        return newUrl
+    else:
+        return url
 
 
 class RequestHandler(object):
@@ -124,19 +149,34 @@ def testFuncDecorator(payload=10):
         portForwarder("https://cmsweb.cern.ch/reqmgr2/data/info")
 
 
-def testSimpleFunc(payload=10):
-    print("testSimpleFunc received payload: {}".format(payload))
+def testSimpleFuncStrReplace(payload=10):
+    print("testSimpleFuncStrReplace received payload: {}".format(payload))
     payload = payload // 3  # payload is the total, so divide by 3
 
     # url failing to be parsed
     for counter in range(int(payload)):
-        replacePort("bad_url")
+        stringReplFunc("bad_url")
     # url not matching anything
     for counter in range(int(payload)):
-        replacePort("https://cmsrucio.cern.ch/blah")
+        stringReplFunc("https://cmsrucio.cern.ch/blah")
     # url matching cmsweb
     for counter in range(int(payload)):
-        replacePort("https://cmsweb.cern.ch/reqmgr2/data/info")
+        stringReplFunc("https://cmsweb.cern.ch/reqmgr2/data/info")
+
+
+def testSimpleFuncUrlParse(payload=10):
+    print("testSimpleFuncUrlParse received payload: {}".format(payload))
+    payload = payload // 3  # payload is the total, so divide by 3
+
+    # url failing to be parsed
+    for counter in range(int(payload)):
+        urlParseFunc("bad_url")
+    # url not matching anything
+    for counter in range(int(payload)):
+        urlParseFunc("https://cmsrucio.cern.ch/blah")
+    # url matching cmsweb
+    for counter in range(int(payload)):
+        urlParseFunc("https://cmsweb.cern.ch/reqmgr2/data/info")
 
 
 def main():
@@ -152,7 +192,11 @@ def main():
     print("Finished single function call in {} secs\n".format(ti))
 
     # print "Started evaluation of %d function calls at: %s" % (numTimes, datetime.utcnow())
-    ti = timeit.timeit("testSimpleFunc(%s)" % numTimes, setup="from __main__ import testSimpleFunc", number=1)
+    ti = timeit.timeit("testSimpleFuncUrlParse(%s)" % numTimes, setup="from __main__ import testSimpleFuncUrlParse", number=1)
+    print("Finished single function call in {} secs\n".format(ti))
+
+    # print "Started evaluation of %d function calls at: %s" % (numTimes, datetime.utcnow())
+    ti = timeit.timeit("testSimpleFuncStrReplace(%s)" % numTimes, setup="from __main__ import testSimpleFuncStrReplace", number=1)
     print("Finished single function call in {} secs\n".format(ti))
 
 
