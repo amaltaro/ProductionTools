@@ -19,39 +19,50 @@ from __future__ import print_function
 import os
 import sys
 import tarfile
-import time
 
 
-def extractFile(logArchName):
+def extractFile(logArchName, fileId):
     """
-    Extract the file and returns the xml data
+    Extract wmagentJob.log file from the tarball and scan for a string pattern
+
+    :param logArchName: string with the absolute path to a log tarball
+    :param fileId: string with a file id (or a fraction of it)
+    :return: print the log tarball that matches the string pattern
     """
     jobName = logArchName.rsplit('/')[-1]
     fName = '%s/wmagentJob.log' % jobName.replace(".tar.bz2", "")
     try:
+        # note that data is loaded as a bytes data type
         with tarfile.open(logArchName, 'r:bz2') as tf:
             jobLog = tf.extractfile(fName)
             rawdata = jobLog.read()
     except IOError:
-        print("Failed to untar %s" % logArchName)
+        print(f"Failed to untar {logArchName}")
     except Exception:
-        print("Unknown failure untarring %s" % logArchName)
+        print(f"Unknown failure untarring {logArchName}")
     else:
-        # if "T2_PK_NCP" in rawdata:
-        if "6420a2d1-6f71-4aea-bbb7-955e67a1db05-0-2-logArchive.tar.gz" in rawdata:
-            print(logArchName)
+        if fileId in rawdata:
+            print(f"  MATCH! LogArchive {logArchName}")
+            sys.exit(0)
     return
 
-
+if len(sys.argv) != 3:
+    print("Error: you must provide a directory path and file id.")
+    print("    e.g.: untarLogArchive /data/srv/wmagent/current/install/wmagent/JobArchiver/logDir/blah fileid_blah.root")
+    sys.exit(1)
 dirPath = sys.argv[1]
+fileId = sys.argv[2]
+# cast the pattern string to bytes data type
+fileId = fileId.encode("utf-8", errors="strict")
+
 subDirs = os.listdir(dirPath)
-print("Found %d sub-directories under: %s" % (len(subDirs), dirPath))
+print(f"Looking for file_id: {fileId} in {len(subDirs)} sub-directories under: {dirPath}")
+
 for subDir in subDirs:
     newDir = os.path.join(dirPath, subDir)
     files = os.listdir(newDir)
-    print("Found %d files under : %s" % (len(files), newDir))
-    for fName in files:
-        extractFile(os.path.join(newDir, fName))
-    time.sleep(5)
+    print(f"Found {len(files)} files under : {newDir}")
+    for logArch in files:
+        extractFile(os.path.join(newDir, logArch), fileId)
     print("\n\n")
 sys.exit(0)
